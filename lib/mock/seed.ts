@@ -1,0 +1,161 @@
+import type { BorrowRequest, Category, Item, ItemImage, Loan } from "@/types/database";
+
+import { DEMO_USER_IDS } from "@/lib/mock/users";
+
+const now = "2026-07-01T00:00:00.000Z";
+
+export const SEED_CATEGORIES: Category[] = [
+  { id: "c1", name: "כלי עבודה" },
+  { id: "c2", name: "ציוד אירוח" },
+  { id: "c3", name: "משחקי קופסה" },
+  { id: "c4", name: "ספרים" },
+  { id: "c5", name: "מזוודות" },
+  { id: "c6", name: "ציוד לאירועים" },
+];
+
+export const SEED_ITEMS: Item[] = [
+  {
+    id: "i1",
+    owner_id: DEMO_USER_IDS.regular,
+    name: "מקדחה חשמלית",
+    description: "מקדחה חזקה עם סוללה, מתאימה לעבודות DIY",
+    category_id: "c1",
+    condition_rating: 8,
+    total_quantity: 1,
+    available_quantity: 1,
+    deposit_amount: 50,
+    area: "שרון",
+    approval_status: "approved",
+    created_at: now,
+  },
+  {
+    id: "i2",
+    owner_id: DEMO_USER_IDS.regular,
+    name: "ערכת כלי גינון",
+    description: "מגרפה, ידית, מזלג גינון",
+    category_id: "c1",
+    condition_rating: 7,
+    total_quantity: 2,
+    available_quantity: 1,
+    deposit_amount: 0,
+    area: "שרון",
+    approval_status: "approved",
+    created_at: now,
+  },
+  {
+    id: "i3",
+    owner_id: DEMO_USER_IDS.admin,
+    name: "מכונת פופקורן",
+    description: "מושלמת לאירועי קהילה",
+    category_id: "c2",
+    condition_rating: 9,
+    total_quantity: 1,
+    available_quantity: 1,
+    deposit_amount: 30,
+    area: "מרכז",
+    approval_status: "approved",
+    created_at: now,
+  },
+  {
+    id: "i4",
+    owner_id: DEMO_USER_IDS.admin,
+    name: "קטאן",
+    description: "משחק קופסה ל-3-4 שחקנים",
+    category_id: "c3",
+    condition_rating: 10,
+    total_quantity: 1,
+    available_quantity: 1,
+    deposit_amount: 0,
+    area: "מרכז",
+    approval_status: "approved",
+    created_at: now,
+  },
+  {
+    id: "i5",
+    owner_id: DEMO_USER_IDS.regular,
+    name: "מזוודה גדולה",
+    description: "מזוודה 28 אינץ', 4 גלגלים",
+    category_id: "c5",
+    condition_rating: 8,
+    total_quantity: 1,
+    available_quantity: 0,
+    deposit_amount: 100,
+    area: "שרון",
+    approval_status: "approved",
+    created_at: now,
+  },
+  {
+    id: "i6",
+    owner_id: DEMO_USER_IDS.regular,
+    name: "אוהל 6 אנשים",
+    description: "ממתין לאישור אדמין",
+    category_id: "c6",
+    condition_rating: 7,
+    total_quantity: 1,
+    available_quantity: 1,
+    deposit_amount: 150,
+    area: "שרון",
+    approval_status: "pending",
+    created_at: now,
+  },
+];
+
+export const SEED_ITEM_IMAGES: ItemImage[] = [
+  { id: "img1", item_id: "i1", url: "https://picsum.photos/seed/drill/800/600" },
+  { id: "img2", item_id: "i2", url: "https://picsum.photos/seed/garden/800/600" },
+  { id: "img3", item_id: "i3", url: "https://picsum.photos/seed/popcorn/800/600" },
+  { id: "img4", item_id: "i4", url: "https://picsum.photos/seed/catan/800/600" },
+  { id: "img5", item_id: "i5", url: "https://picsum.photos/seed/suitcase/800/600" },
+];
+
+export const SEED_BORROW_REQUESTS: BorrowRequest[] = [
+  {
+    id: "br1",
+    item_id: "i1",
+    requester_id: DEMO_USER_IDS.admin,
+    start_date: "2026-07-20",
+    end_date: "2026-07-25",
+    requested_quantity: 1,
+    status: "pending",
+    created_at: now,
+  },
+  {
+    id: "br2",
+    item_id: "i5",
+    requester_id: DEMO_USER_IDS.admin,
+    start_date: "2026-07-01",
+    end_date: "2026-07-10",
+    requested_quantity: 1,
+    status: "approved",
+    created_at: now,
+  },
+  {
+    id: "br3",
+    item_id: "i2",
+    requester_id: DEMO_USER_IDS.admin,
+    start_date: "2026-06-01",
+    end_date: "2026-06-05",
+    requested_quantity: 1,
+    status: "approved",
+    created_at: now,
+  },
+];
+
+export const SEED_LOANS: Loan[] = [
+  {
+    id: "l1",
+    borrow_request_id: "br2",
+    status: "active",
+    actual_return_date: null,
+    deposit_received: true,
+    created_at: now,
+  },
+  {
+    id: "l2",
+    borrow_request_id: "br3",
+    status: "completed",
+    actual_return_date: "2026-06-05",
+    deposit_received: false,
+    created_at: now,
+  },
+];

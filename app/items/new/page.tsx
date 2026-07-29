@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 
 import { AppNav } from "@/components/AppNav";
-import { AdminPanel } from "@/components/AdminPanel";
 import { NewItemForm } from "@/components/NewItemForm";
 import { getCurrentUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
-  title: "הוספת פריט | Community Share",
+  title: "הוספת פריט | שיתוף קהילתי",
 };
 
 export default async function NewItemPage() {
@@ -16,14 +15,18 @@ export default async function NewItemPage() {
   const categories = await repo.getCategories();
 
   return (
-    <div>
-      <AppNav user={user} />
-      <main className="mx-auto max-w-lg px-4 py-8">
-        <h1 className="mb-6 text-2xl font-bold">הוספת פריט</h1>
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200">
-          <NewItemForm categories={categories} />
+    <AppNav user={user} activePath="/my-items" title="הוספת פריט">
+      <div className="mx-auto max-w-3xl">
+        <div className="mb-stack-lg">
+          <h2 className="font-headline mb-2 text-3xl text-brand-deep">
+            שתפו פריט חדש עם השכנים
+          </h2>
+          <p className="text-on-surface-variant">
+            עזרו לבנות קהילה חזקה יותר על ידי השאלת חפצים שאינכם משתמשים בהם ביום-יום.
+          </p>
         </div>
-      </main>
-    </div>
+        <NewItemForm categories={categories} />
+      </div>
+    </AppNav>
   );
 }

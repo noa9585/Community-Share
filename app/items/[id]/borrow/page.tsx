@@ -1,65 +1,30 @@
-"use client";
+import { notFound, redirect } from "next/navigation";
 
-import Link from "next/link";
-import { useParams } from "next/navigation";
+import { AppNav } from "@/components/AppNav";
+import { BorrowRequestForm } from "@/components/BorrowRequestForm";
+import { getCurrentUser } from "@/lib/auth/session";
+import { getRepository } from "@/lib/data/index";
 
-import { FormMessage, useFormAction } from "@/components/FormHelpers";
-import { createBorrowRequestAction } from "@/lib/actions/borrow";
+export default async function BorrowRequestPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
+  const user = await getCurrentUser();
+  if (!user || user.status !== "approved") {
+    redirect(user ? "/pending-approval" : "/login");
+  }
 
-export default function BorrowRequestPage() {
-  const params = useParams<{ id: string }>();
-  const [state, action, pending] = useFormAction(createBorrowRequestAction);
+  const repo = await getRepository();
+  const item = await repo.getItemById(id);
+  if (!item) notFound();
 
   return (
-    <div>
-      <main className="mx-auto max-w-lg space-y-6 px-4 py-8">
-        <Link href={`/items/${params.id}`} className="text-sm text-emerald-700">
-          חזרה לפריט
-        </Link>
-        <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200">
-          <h1 className="text-2xl font-bold">בקשת השאלה</h1>
-          <form action={action} className="mt-6 space-y-4">
-            <input type="hidden" name="itemId" value={params.id} />
-            <FormMessage state={state} />
-            <label className="block space-y-1 text-sm">
-              <span>תאריך התחלה</span>
-              <input
-                name="startDate"
-                type="date"
-                required
-                className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-              />
-            </label>
-            <label className="block space-y-1 text-sm">
-              <span>תאריך סיום</span>
-              <input
-                name="endDate"
-                type="date"
-                required
-                className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-              />
-            </label>
-            <label className="block space-y-1 text-sm">
-              <span>כמות</span>
-              <input
-                name="requestedQuantity"
-                type="number"
-                min={1}
-                defaultValue={1}
-                required
-                className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={pending}
-              className="w-full rounded-xl bg-emerald-600 py-3 font-medium text-white disabled:opacity-60"
-            >
-              {pending ? "שולח..." : "שלח בקשה"}
-            </button>
-          </form>
-        </div>
-      </main>
-    </div>
+    <AppNav user={user} activePath="/catalog" title="שיתוף קהילתי">
+      <div className="flex min-h-[70vh] items-center justify-center">
+        <BorrowRequestForm item={item} />
+      </div>
+    </AppNav>
   );
 }

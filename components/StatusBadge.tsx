@@ -1,12 +1,12 @@
 const STATUS_STYLES: Record<string, string> = {
-  pending: "bg-amber-100 text-amber-800",
-  approved: "bg-emerald-100 text-emerald-800",
-  rejected: "bg-red-100 text-red-800",
-  blocked: "bg-red-100 text-red-800",
-  active: "bg-blue-100 text-blue-800",
-  returned_pending_confirmation: "bg-purple-100 text-purple-800",
-  completed: "bg-zinc-100 text-zinc-700",
-  late: "bg-red-100 text-red-800",
+  pending: "bg-primary-fixed text-on-primary-fixed border-primary/10",
+  approved: "bg-primary-container text-on-primary-container border-primary/10",
+  rejected: "bg-error-container text-on-error-container border-error/10",
+  blocked: "bg-error-container text-on-error-container border-error/10",
+  active: "bg-secondary-container text-on-secondary-container border-secondary/10",
+  returned_pending_confirmation: "bg-tertiary-container text-on-tertiary-container border-tertiary/10",
+  completed: "bg-surface-variant text-on-surface-variant border-outline-variant/30",
+  late: "bg-error-container text-on-error-container border-error/10",
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -23,9 +23,30 @@ const STATUS_LABELS: Record<string, string> = {
 export function StatusBadge({ status }: { status: string }) {
   return (
     <span
-      className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${STATUS_STYLES[status] ?? "bg-zinc-100 text-zinc-700"}`}
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${STATUS_STYLES[status] ?? "bg-surface-container text-on-surface-variant border-outline-variant/30"}`}
     >
       {STATUS_LABELS[status] ?? status}
+    </span>
+  );
+}
+
+export function AvailabilityBadge({
+  available,
+  total,
+}: {
+  available: number;
+  total: number;
+}) {
+  const isAvailable = available > 0;
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
+        isAvailable
+          ? "bg-primary-container text-on-primary-container"
+          : "bg-surface-variant text-on-surface-variant"
+      }`}
+    >
+      {isAvailable ? "פנוי" : "בהשאלה"}
     </span>
   );
 }

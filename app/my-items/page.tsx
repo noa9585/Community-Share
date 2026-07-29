@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
-  title: "הפריטים שלי | Community Share",
+  title: "הפריטים שלי | שיתוף קהילתי",
 };
 
 export default async function MyItemsPage() {
@@ -19,12 +19,14 @@ export default async function MyItemsPage() {
   ]);
 
   return (
-    <div>
-      <AppNav user={user} />
-      <main className="mx-auto max-w-3xl px-4 py-8">
-        <h1 className="mb-6 text-2xl font-bold">הפריטים שלי</h1>
-        <MyItemsList items={items} incomingRequests={incomingRequests} />
-      </main>
-    </div>
+    <AppNav user={user} activePath="/my-items" title="הפריטים שלי" showSearch>
+      <div className="mb-stack-lg">
+        <h2 className="font-headline mb-2 text-3xl text-brand-deep">הפריטים שלי</h2>
+        <p className="text-on-surface-variant">
+          נהלו את הפריטים שלכם ואשרו בקשות השאלה מהשכנים
+        </p>
+      </div>
+      <MyItemsList items={items} incomingRequests={incomingRequests} />
+    </AppNav>
   );
 }

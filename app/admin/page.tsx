@@ -6,7 +6,7 @@ import { getCurrentUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
-  title: "פאנל אדמין | Community Share",
+  title: "פאנל ניהול | שיתוף קהילתי",
 };
 
 export default async function AdminPage() {
@@ -15,17 +15,16 @@ export default async function AdminPage() {
   const dashboard = await repo.getAdminDashboard();
 
   return (
-    <div>
-      <AppNav user={user} />
-      <main className="mx-auto max-w-4xl px-4 py-8">
-        <h1 className="mb-6 text-2xl font-bold">פאנל אדמין</h1>
-        <AdminPanel
-          pendingUsers={dashboard.pendingUsers}
-          pendingItems={dashboard.pendingItems}
-          activeLoans={dashboard.activeLoans}
-          lateLoans={dashboard.lateLoans}
-        />
-      </main>
-    </div>
+    <AppNav user={user} activePath="/admin" title="שיתוף קהילתי" showSearch>
+      <div className="mb-6 flex items-center gap-4">
+        <h1 className="font-headline text-2xl font-semibold text-brand-deep">פאנל אדמין</h1>
+      </div>
+      <AdminPanel
+        pendingUsers={dashboard.pendingUsers}
+        pendingItems={dashboard.pendingItems}
+        activeLoans={dashboard.activeLoans}
+        lateLoans={dashboard.lateLoans}
+      />
+    </AppNav>
   );
 }

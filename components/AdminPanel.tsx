@@ -4,11 +4,42 @@ import { AdminItemActions, AdminUserActions } from "@/components/ItemActions";
 import { ItemThumbnail } from "@/components/ItemCard";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { StatusBadge } from "@/components/StatusBadge";
-import type { AdminDashboard, LoanWithRelations, User } from "@/types/database";
+import type {
+  AdminDashboard,
+  EmailLogEntry,
+  EmailLogType,
+  LoanWithRelations,
+  User,
+} from "@/types/database";
 
 const CARD = "overflow-hidden rounded-xl border border-secondary/10 bg-white";
 const HEADING = "font-headline-sm text-headline-sm text-brand-deep";
 const EMPTY = "p-6 text-center font-body-md text-on-surface-variant";
+
+const EMAIL_TYPE_LABELS: Record<EmailLogType, string> = {
+  request_created: "בקשת השאלה חדשה",
+  request_approved: "בקשה אושרה",
+  request_rejected: "בקשה נדחתה",
+  user_approved: "משתמש אושר",
+  item_approved: "פריט אושר",
+  return_reminder: "תזכורת החזרה",
+  loan_overdue: "השאלה באיחור",
+  return_marked: "סומנה החזרה",
+};
+
+const EMAIL_STATUS: Record<EmailLogEntry["status"], { label: string; className: string }> = {
+  sent: { label: "נשלח", className: "bg-primary-container text-on-primary-container" },
+  failed: { label: "נכשל", className: "bg-error-container text-on-error-container" },
+  skipped: { label: "דולג (אין מפתח)", className: "bg-surface-variant text-on-surface-variant" },
+};
+
+function formatDateTime(value: string): string {
+  return new Intl.DateTimeFormat("he-IL", {
+    dateStyle: "short",
+    timeStyle: "short",
+    timeZone: "Asia/Jerusalem",
+  }).format(new Date(value));
+}
 
 function StatCard({
   icon,
@@ -96,9 +127,11 @@ function LoanList({ loans, empty }: { loans: LoanWithRelations[]; empty: string 
 
 export function AdminPanel({
   dashboard,
+  emailLog,
   currentAdminId,
 }: {
   dashboard: AdminDashboard;
+  emailLog: EmailLogEntry[];
   currentAdminId: string;
 }) {
   const { pendingUsers, users, pendingItems, activeLoans, lateLoans } = dashboard;
@@ -179,6 +212,36 @@ export function AdminPanel({
             <ul className="divide-y divide-secondary/5">
               {members.map((user) => (
                 <UserRow key={user.id} user={user} currentAdminId={currentAdminId} />
+              ))}
+            </ul>
+          )}
+        </div>
+      </section>
+
+      <section className="space-y-4">
+        <h2 className={HEADING}>יומן מיילים</h2>
+        <p className="text-sm text-on-surface-variant">
+          20 ההודעות האחרונות שהמערכת שלחה דרך Resend. היומן לא שומר את תוכן ההודעה או את הכתובת.
+        </p>
+        <div className={CARD}>
+          {emailLog.length === 0 ? (
+            <p className={EMPTY}>עדיין לא נשלחו מיילים</p>
+          ) : (
+            <ul className="divide-y divide-secondary/5">
+              {emailLog.map((entry) => (
+                <li key={entry.id} className="flex flex-wrap items-center justify-between gap-3 p-4">
+                  <div className="min-w-0">
+                    <p className="font-bold text-brand-deep">{EMAIL_TYPE_LABELS[entry.type]}</p>
+                    <p className="text-sm text-on-surface-variant">
+                      אל: {entry.recipient_name ?? "משתמש שנמחק"} · {formatDateTime(entry.sent_at)}
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-3 py-1 text-xs font-bold ${EMAIL_STATUS[entry.status].className}`}
+                  >
+                    {EMAIL_STATUS[entry.status].label}
+                  </span>
+                </li>
               ))}
             </ul>
           )}

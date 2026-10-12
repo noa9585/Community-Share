@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 
 import { requireAdminUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
+import { notifyItemApproved, notifyUserApproved } from "@/lib/email/notify";
 import { messageForError } from "@/lib/errors";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import {
@@ -35,6 +36,10 @@ export async function adminUserAction(
     return { error: messageForError(error, "לא ניתן לעדכן את המשתמש") };
   }
 
+  if (parsed.data.action === "approve") {
+    await notifyUserApproved(parsed.data.userId);
+  }
+
   revalidatePath("/admin");
   return { success: "סטטוס המשתמש עודכן" };
 }
@@ -60,6 +65,10 @@ export async function adminItemAction(
     await repo.updateItemApproval(parsed.data.itemId, parsed.data.action);
   } catch (error) {
     return { error: messageForError(error, "לא ניתן לעדכן את הפריט") };
+  }
+
+  if (parsed.data.action === "approve") {
+    await notifyItemApproved(parsed.data.itemId);
   }
 
   revalidatePath("/admin");

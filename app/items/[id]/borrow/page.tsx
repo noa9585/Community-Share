@@ -76,6 +76,7 @@ export default async function BorrowRequestPage({
             <BorrowRequestForm
               itemId={item.id}
               totalQuantity={item.total_quantity}
+              bookings={bookings}
               today={today}
               maxLoanDays={MAX_LOAN_DAYS}
             />

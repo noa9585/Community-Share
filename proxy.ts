@@ -5,7 +5,8 @@ import { MOCK_USER_COOKIE } from "@/lib/mock/users";
 import { updateSession } from "@/lib/supabase/middleware";
 
 // Reachable without a session.
-const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/auth/callback"];
+// /api/cron authenticates itself with a bearer secret (see the route handler).
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/auth/callback", "/api/cron"];
 
 // Reachable with a session regardless of approval status.
 const AUTH_ONLY_PATHS = ["/pending-approval", "/blocked", "/reset-password"];

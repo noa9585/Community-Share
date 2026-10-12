@@ -8,6 +8,7 @@ import type {
   BorrowRequest,
   BorrowRequestWithRelations,
   Category,
+  EmailLogEntry,
   HomeDashboard,
   Item,
   ItemBooking,
@@ -32,14 +33,20 @@ const USER_SELECT = "id, full_name, email, residence_area, role, status, created
 const ITEM_SELECT =
   "id, owner_id, name, description, category_id, condition_rating, total_quantity, " +
   "available_quantity, deposit_amount, area, approval_status, created_at, " +
-  "category:categories(id, name), item_images(id, item_id, storage_path, created_at)";
+  "category:categories(id, name, icon), item_images(id, item_id, storage_path, sort_order, created_at)";
 
 const REQUEST_SELECT =
   "id, item_id, requester_id, start_date, end_date, requested_quantity, status, created_at, " +
   "loan:loans(id, borrow_request_id, status, actual_return_date, deposit_received, created_at), " +
   `item:items(${ITEM_SELECT})`;
 
-type ImageRow = { id: string; item_id: string; storage_path: string; created_at: string };
+type ImageRow = {
+  id: string;
+  item_id: string;
+  storage_path: string;
+  sort_order: number;
+  created_at: string;
+};
 
 type ItemRow = Omit<Item, "category" | "item_images" | "owner"> & {
   category: Category | Category[] | null;
@@ -130,8 +137,8 @@ async function hydrateItems(
 
   const imagesByItem = new Map<string, ImageRow[]>();
   for (const row of rows) {
-    const sorted = [...(row.item_images ?? [])].sort((a, b) =>
-      a.created_at.localeCompare(b.created_at),
+    const sorted = [...(row.item_images ?? [])].sort(
+      (a, b) => a.sort_order - b.sort_order || a.created_at.localeCompare(b.created_at),
     );
     imagesByItem.set(row.id, options.allImages ? sorted : sorted.slice(0, 1));
   }
@@ -277,7 +284,7 @@ export const supabaseRepository: DataRepository = {
   async getCategories() {
     const supabase = await createClient();
     return assertRead<Category[]>(
-      await supabase.from("categories").select("id, name").order("name"),
+      await supabase.from("categories").select("id, name, icon").order("name"),
     );
   },
 
@@ -288,7 +295,7 @@ export const supabaseRepository: DataRepository = {
     const itemIds = await ownedItemIds(supabase, userId);
 
     const [categories, recentRows, loanRows, pendingRows] = await Promise.all([
-      supabase.from("categories").select("id, name").order("name").limit(6),
+      supabase.from("categories").select("id, name, icon").order("name").limit(8),
       supabase
         .from("items")
         .select(ITEM_SELECT)
@@ -511,6 +518,28 @@ export const supabaseRepository: DataRepository = {
     };
   },
 
+  async getEmailLog(limit): Promise<EmailLogEntry[]> {
+    const supabase = await createClient();
+    const rows = assertRead<
+      (Omit<EmailLogEntry, "recipient_name"> & { recipient_user_id: string | null })[]
+    >(
+      await supabase
+        .from("email_log")
+        .select("id, type, status, sent_at, recipient_user_id")
+        .order("sent_at", { ascending: false })
+        .limit(limit),
+    );
+    const names = await fetchNames(
+      supabase,
+      unique(rows.flatMap((row) => (row.recipient_user_id ? [row.recipient_user_id] : []))),
+      "users",
+    );
+    return rows.map(({ recipient_user_id, ...row }) => ({
+      ...row,
+      recipient_name: recipient_user_id ? (names.get(recipient_user_id)?.full_name ?? null) : null,
+    }));
+  },
+
   async createItem(userId, input, images) {
     const supabase = await createClient();
     const id = (await rpcWrite(supabase, "create_item", {
@@ -563,12 +592,13 @@ export const supabaseRepository: DataRepository = {
 
   async createBorrowRequest(_userId, input) {
     const supabase = await createClient();
-    await rpcWrite(supabase, "create_borrow_request", {
+    const id = (await rpcWrite(supabase, "create_borrow_request", {
       p_item_id: input.itemId,
       p_start_date: input.startDate,
       p_end_date: input.endDate,
       p_quantity: input.requestedQuantity,
-    });
+    })) as string;
+    return { id };
   },
 
   async cancelBorrowRequest(requestId) {

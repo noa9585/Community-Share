@@ -4,6 +4,11 @@ import { revalidatePath } from "next/cache";
 
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
+import {
+  notifyRequestCreated,
+  notifyRequestDecision,
+  notifyReturnMarked,
+} from "@/lib/email/notify";
 import { messageForError } from "@/lib/errors";
 import { enforceRateLimit } from "@/lib/security/rate-limit";
 import {
@@ -30,14 +35,18 @@ export async function createBorrowRequestAction(
     return { error: parsed.error.issues[0]?.message ?? "קלט לא תקין" };
   }
 
+  let requestId: string;
   try {
     await enforceRateLimit("borrowRequest", user.id);
     const repo = await getRepository();
     // Availability, ownership and date rules are re-checked inside the database.
-    await repo.createBorrowRequest(user.id, parsed.data);
+    const { id } = await repo.createBorrowRequest(user.id, parsed.data);
+    requestId = id;
   } catch (error) {
     return { error: messageForError(error, "שגיאה בשליחת הבקשה") };
   }
+
+  await notifyRequestCreated(requestId);
 
   revalidatePath("/my-loans");
   revalidatePath("/");
@@ -75,6 +84,10 @@ export async function handleBorrowRequestAction(
     return { error: messageForError(error, "שגיאה בעדכון הבקשה") };
   }
 
+  if (action !== "cancel") {
+    await notifyRequestDecision(requestId, action === "approve");
+  }
+
   revalidatePath("/", "layout");
   const messages = { approve: "הבקשה אושרה", reject: "הבקשה נדחתה", cancel: "הבקשה בוטלה" };
   return { success: messages[action] };
@@ -109,6 +122,10 @@ export async function handleLoanAction(
     }
   } catch (error) {
     return { error: messageForError(error, "שגיאה בביצוע הפעולה") };
+  }
+
+  if (action === "mark_returned") {
+    await notifyReturnMarked(loanId);
   }
 
   revalidatePath("/", "layout");

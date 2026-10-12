@@ -40,7 +40,7 @@ export default async function HomePage() {
               <CategoryButton
                 key={category.id}
                 name={category.name}
-                icon={getCategoryIcon(category.name)}
+                icon={category.icon ?? getCategoryIcon(category.name)}
                 href={`/catalog?category=${category.id}`}
               />
             ))}

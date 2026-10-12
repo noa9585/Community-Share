@@ -2,6 +2,7 @@ import type { ItemInput, ProfileInput } from "@/lib/validation/schemas";
 import type {
   AdminDashboard,
   BorrowRequestWithRelations,
+  EmailLogEntry,
   HomeDashboard,
   ItemBooking,
   ItemWithRelations,
@@ -36,6 +37,7 @@ export interface DataRepository {
   getOwnerLoans(ownerId: string): Promise<BorrowRequestWithRelations[]>;
   getMyLoans(userId: string): Promise<BorrowRequestWithRelations[]>;
   getAdminDashboard(): Promise<AdminDashboard>;
+  getEmailLog(limit: number): Promise<EmailLogEntry[]>;
   createItem(
     userId: string,
     input: ItemInput,
@@ -52,7 +54,7 @@ export interface DataRepository {
   createBorrowRequest(
     userId: string,
     input: { itemId: string; startDate: string; endDate: string; requestedQuantity: number },
-  ): Promise<void>;
+  ): Promise<{ id: string }>;
   cancelBorrowRequest(requestId: string, requesterId: string): Promise<void>;
   approveBorrowRequest(requestId: string, ownerId: string): Promise<void>;
   rejectBorrowRequest(requestId: string, ownerId: string): Promise<void>;

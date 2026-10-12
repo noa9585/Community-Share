@@ -208,6 +208,11 @@ export const mockRepository: DataRepository = {
     };
   },
 
+  // Demo mode sends no e-mail, so there is nothing to log.
+  async getEmailLog() {
+    return [];
+  },
+
   async createItem(userId, input, images) {
     const itemId = createId();
     const item: Item = {
@@ -275,8 +280,9 @@ export const mockRepository: DataRepository = {
   },
 
   async createBorrowRequest(userId, input) {
+    const id = createId();
     insertBorrowRequest({
-      id: createId(),
+      id,
       item_id: input.itemId,
       requester_id: userId,
       start_date: input.startDate,
@@ -285,6 +291,7 @@ export const mockRepository: DataRepository = {
       status: "pending",
       created_at: new Date().toISOString(),
     });
+    return { id };
   },
 
   async cancelBorrowRequest(requestId, requesterId) {

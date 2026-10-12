@@ -21,6 +21,8 @@ export interface User {
 export interface Category {
   id: string;
   name: string;
+  /** Material Symbols glyph name. */
+  icon?: string;
 }
 
 export interface Item {
@@ -93,6 +95,24 @@ export type AdminDashboard = {
   pendingItems: ItemWithRelations[];
   activeLoans: LoanWithRelations[];
   lateLoans: LoanWithRelations[];
+};
+
+export type EmailLogType =
+  | "request_created"
+  | "request_approved"
+  | "request_rejected"
+  | "user_approved"
+  | "item_approved"
+  | "return_reminder"
+  | "loan_overdue"
+  | "return_marked";
+
+export type EmailLogEntry = {
+  id: string;
+  type: EmailLogType;
+  status: "sent" | "failed" | "skipped";
+  sent_at: string;
+  recipient_name: string | null;
 };
 
 export type HomeDashboard = {

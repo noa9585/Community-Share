@@ -12,12 +12,15 @@ export const metadata: Metadata = {
 export default async function AdminPage() {
   const user = await requirePageAdmin();
   const repo = await getRepository();
-  const dashboard = await repo.getAdminDashboard();
+  const [dashboard, emailLog] = await Promise.all([
+    repo.getAdminDashboard(),
+    repo.getEmailLog(20),
+  ]);
 
   return (
     <AppNav user={user} activePath="/admin" headerTitle="פאנל ניהול">
       <h1 className="mb-stack-lg font-headline-md text-headline-md text-brand-deep">פאנל ניהול</h1>
-      <AdminPanel dashboard={dashboard} currentAdminId={user.id} />
+      <AdminPanel dashboard={dashboard} emailLog={emailLog} currentAdminId={user.id} />
     </AppNav>
   );
 }

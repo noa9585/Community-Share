@@ -1,48 +1,117 @@
-# Community Share
+# שיתוף קהילתי
 
-פלטפורמה קהילתית סגורה לניהול השאלת ציוד – Next.js + Supabase + Vercel.
+**הבעיה:** בכל קהילה יש ציוד יקר שנמצא בשימוש פעמיים בשנה – מקדחה, סולם, מזוודה גדולה, מיחם – ואין דרך
+מסודרת לדעת למי יש מה, מתי זה פנוי, ומי מחזיק מה כרגע.
 
-## Demo mode (local development)
+**הפתרון:** פלטפורמה סגורה לקהילה אחת, שבה חברים מעלים פריטים להשאלה, מחפשים ציוד פנוי, שולחים בקשת
+השאלה לתאריכים מסוימים, ועוקבים אחרי ההחזרות – תחת פיקוח של אדמין הקהילה.
 
-1. Copy `.env.example` to `.env.local`
-2. Keep `USE_MOCK_DATA=true`
-3. `npm install && npm run dev`
-4. Open `/login` and pick a demo user (admin / regular member / pending approval)
+🔗 **האתר החי:** https://community-share-bice.vercel.app
 
-Demo data lives in memory and resets whenever the server restarts.
+## צילומי מסך
 
-## Supabase mode (production)
+| דף הבית | קטלוג | עמוד פריט ולוח תפוסות | פאנל אדמין |
+|---|---|---|---|
+| _להוסיף צילום_ | _להוסיף צילום_ | _להוסיף צילום_ | _להוסיף צילום_ |
 
-1. Create a Supabase project.
-2. Run the SQL files in `supabase/migrations/` in order (001 → 004), e.g. in the SQL Editor.
-3. Set the environment variables (see `.env.example`):
-   - `USE_MOCK_DATA=false`
-   - `NEXT_PUBLIC_SITE_URL` – the public origin of the site
-   - `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-   - `SUPABASE_SERVICE_ROLE_KEY` (secret, server only)
-4. In Supabase → Authentication → URL Configuration:
-   - **Site URL**: your site origin
-   - **Redirect URLs**: `{SITE_URL}/auth/callback`
-5. Register through the site, then promote the first admin once:
+## משתמשי דמו
 
-```sql
-UPDATE public.users SET role = 'admin', status = 'approved' WHERE email = 'your@email.com';
+| תפקיד | אימייל | סיסמה |
+|---|---|---|
+| חבר קהילה | `demo.user@example.com` | _להשלים_ |
+| אדמין | `demo.admin@example.com` | _להשלים_ |
+
+## מה אפשר לעשות
+
+- **חבר קהילה:** הרשמה (ממתינה לאישור אדמין), חיפוש עם השלמה אוטומטית, סינון לפי קטגוריה, אזור וזמינות
+  בתאריכים, צפייה בלוח התפוסות של פריט, שליחת בקשת השאלה, מעקב אחרי ההשאלות וסימון החזרה.
+- **בעל פריט:** הוספה, עריכה ומחיקה של פריטים (עם תמונות, מצב 1–10, כמות ופיקדון), אישור או דחייה של
+  בקשות, סימון קבלת פיקדון ואישור החזרה.
+- **אדמין:** אישור משתמשים ופריטים חדשים, חסימה ושחרור של משתמשים, מעקב אחרי השאלות פעילות ובאיחור,
+  ויומן המיילים שהמערכת שלחה.
+- **מיילים אוטומטיים (Resend):** בקשה חדשה, אישור ודחייה, אישור משתמש ופריט, תזכורת יום לפני מועד
+  ההחזרה, והודעת איחור.
+
+## טכנולוגיות
+
+| שכבה | טכנולוגיה |
+|---|---|
+| ממשק | Next.js 16 (App Router), React 19, Tailwind CSS 4, עברית ו-RTL |
+| שרת | Server Actions ו-Route Handler אחד (המשימה היומית) |
+| מסד נתונים | Supabase – PostgreSQL עם Row Level Security |
+| אימות | Supabase Auth (אימייל וסיסמה, אימות כתובת) |
+| קבצים | Supabase Storage – bucket פרטי עם קישורים חתומים |
+| מיילים | Resend |
+| פריסה ותזמון | Vercel, Vercel Cron |
+
+## ארכיטקטורה
+
+```
+דפדפן
+  │  (הדפדפן לעולם לא פונה ישירות ל-Supabase או ל-Resend)
+  ▼
+proxy.ts ── רענון סשן, חסימת נתיבים לפי סטטוס ותפקיד, CSP עם nonce
+  ▼
+דפים (Server Components) ── קריאת נתונים דרך ה-Repository
+Server Actions ── בדיקת משתמש ← ולידציה (Zod) ← הגבלת קצב ← Repository ← מייל
+  ▼
+Repository (lib/data) ── ממשק אחד, שני מימושים: Supabase (פרודקשן) ו-Mock (דמו מקומי)
+  ▼
+Supabase ── טבלאות לקריאה בלבד תחת RLS; כל כתיבה היא פונקציית מסד שבודקת מי הקורא
 ```
 
-After that, new members are approved from the admin panel.
+מסמכים נוספים בתיקיית [`docs/`](docs/):
+[מודל הנתונים](docs/DATA_MODEL.md) · [ERD](docs/ERD.md) · [הרשאות RLS](docs/RLS.md) ·
+[חיבורים חיצוניים](docs/INTEGRATIONS.md) · [תרשימי זרימה](docs/FLOWS.md) ·
+[תוכנית בדיקות](docs/TEST_PLAN.md) · [אבטחה](SECURITY.md)
 
-## Architecture
+## התקנה והרצה
 
-- **`proxy.ts`** – runs before every request: refreshes the session, guards routes by
-  account status and role, and sets a per-request Content-Security-Policy nonce.
-- **Server Actions** (`lib/actions/`) – every mutation: checks the session, validates
-  input with Zod, applies a rate limit, then calls the repository.
-- **Repository** (`lib/data/repository.ts`) – one interface, two implementations:
-  `lib/mock/` (in-memory demo) and `lib/supabase/` (production).
-- **Database** (`supabase/migrations/`) – tables are read-only for clients and filtered
-  by Row Level Security; every write is a `SECURITY DEFINER` function that re-checks
-  who is calling.
+דרוש Node.js 20 ומעלה.
 
-## Security
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
 
-See [`SECURITY.md`](SECURITY.md).
+עם `USE_MOCK_DATA=true` (ברירת המחדל ב-`.env.example`) האתר רץ על נתוני דמו בזיכרון, בלי מסד נתונים:
+נכנסים ל-`/login` ובוחרים משתמש דמו.
+
+### הרצה מול Supabase
+
+1. ליצור פרויקט Supabase ולהריץ את הקבצים שב-`supabase/migrations/` לפי הסדר (001 עד 005).
+2. למלא את משתני הסביבה (ראו למטה) ולהגדיר `USE_MOCK_DATA=false`.
+3. ב-Supabase ← Authentication ← URL Configuration: להגדיר Site URL, ולהוסיף את
+   `{SITE_URL}/auth/callback` ל-Redirect URLs.
+4. להירשם באתר, ואז להפוך את החשבון הראשון לאדמין (פעם אחת):
+   ```sql
+   UPDATE public.users SET role = 'admin', status = 'approved' WHERE email = 'you@example.com';
+   ```
+5. לנתוני דמו: `node --env-file=.env.local --experimental-strip-types scripts/create-demo-users.ts`
+   ואז להריץ את `supabase/seed.sql`.
+
+## משתני סביבה
+
+| משתנה | סודי? | תיאור |
+|---|---|---|
+| `USE_MOCK_DATA` | לא | `true` למצב דמו בלי מסד נתונים |
+| `NEXT_PUBLIC_SITE_URL` | לא | כתובת האתר, לקישורים במיילים |
+| `NEXT_PUBLIC_SUPABASE_URL` | לא | כתובת פרויקט Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | לא | מפתח ציבורי; ההגנה היא ב-RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | **כן** | צד שרת בלבד: הגבלת קצב, מיילים, משימה יומית |
+| `RESEND_API_KEY` | **כן** | צד שרת בלבד. בלעדיו המיילים מדולגים ונרשמים ביומן כ"דולג" |
+| `EMAIL_FROM` | לא | כתובת השולח, מדומיין מאומת ב-Resend |
+| `CRON_SECRET` | **כן** | מגן על `/api/cron/daily` |
+
+שום סוד לא נמצא בקוד או ב-git; קובצי `.env*` מוחרגים ב-`.gitignore`.
+
+## בדיקות
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+בדיקות ידניות למסלול המרכזי ולניסיונות גישה לא מורשים: [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md).

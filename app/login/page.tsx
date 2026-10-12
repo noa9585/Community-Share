@@ -1,47 +1,45 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 
+import { AuthCard } from "@/components/AuthCard";
 import { DemoLoginButtons } from "@/components/DemoLoginButtons";
 import { LoginFormInner } from "@/components/LoginFormInner";
-import { MaterialIcon } from "@/components/MaterialIcon";
 import { isMockMode } from "@/lib/config";
+import { safeRedirectPath } from "@/lib/utils/url";
 
 export const metadata: Metadata = {
   title: "התחברות | שיתוף קהילתי",
 };
 
-export default function LoginPage() {
+export default async function LoginPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ next?: string | string[]; notice?: string | string[] }>;
+}) {
+  const params = await searchParams;
   const mockMode = isMockMode();
+  const next = safeRedirectPath(params.next, "");
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-primary-container p-gutter">
-      <div className="w-full max-w-md overflow-hidden rounded-2xl border border-secondary/15 bg-white shadow-sm">
-        <div className="bg-secondary px-6 py-8 text-center text-on-secondary">
-          <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-brand-mint bg-primary-container">
-            <MaterialIcon name="groups" className="text-secondary" size={32} />
+    <AuthCard title="התחברות">
+      {params.notice === "link" && (
+        <p role="status" className="mb-4 rounded-lg bg-tertiary-container px-3 py-2 text-sm text-on-tertiary-fixed-variant">
+          הקישור כבר נוצל או שפג תוקפו. אם אימתת את כתובת האימייל, אפשר פשוט להתחבר.
+        </p>
+      )}
+      {mockMode ? (
+        <>
+          <p className="text-sm text-on-surface-variant">מצב דמו – בחר/י משתמש להתחברות</p>
+          <div className="mt-6">
+            <DemoLoginButtons />
           </div>
-          <h1 className="font-headline text-2xl font-bold">שיתוף קהילתי</h1>
-          <p className="mt-1 text-sm opacity-80">בניית אמון מקומי</p>
-        </div>
-        <div className="p-6">
-          <h2 className="font-headline mb-4 text-xl font-semibold text-brand-deep">התחברות</h2>
-          {mockMode ? (
-            <>
-              <p className="text-sm text-on-surface-variant">מצב דמו – בחר/י משתמש להתחברות</p>
-              <div className="mt-6">
-                <DemoLoginButtons />
-              </div>
-              <div className="mt-4 text-sm">
-                <Link href="/register" className="font-medium text-secondary hover:text-brand-deep">
-                  הרשמה
-                </Link>
-              </div>
-            </>
-          ) : (
-            <LoginFormInner />
-          )}
-        </div>
-      </div>
-    </div>
+          <Link href="/register" className="mt-4 block text-sm font-medium text-secondary hover:underline">
+            הרשמה
+          </Link>
+        </>
+      ) : (
+        <LoginFormInner next={next || undefined} />
+      )}
+    </AuthCard>
   );
 }

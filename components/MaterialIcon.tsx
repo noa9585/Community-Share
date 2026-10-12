@@ -28,6 +28,10 @@ export function MaterialIcon({
 
 const CATEGORY_ICONS: Record<string, string> = {
   "כלי עבודה": "handyman",
+  "ציוד אירוח": "flatware",
+  "משחקי קופסה": "sports_esports",
+  מזוודות: "luggage",
+  "ציוד לאירועים": "celebration",
   מטבח: "kitchen",
   "קמפינג וטיולים": "camera_rear",
   "ילדים וצעצועים": "child_care",

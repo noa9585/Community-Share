@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 
+import { AUTH_BUTTON, AUTH_INPUT, AUTH_LABEL } from "@/components/AuthCard";
 import { FormMessage, useFormAction } from "@/components/FormHelpers";
 import { registerAction } from "@/lib/actions/auth";
 import { RESIDENCE_AREAS } from "@/lib/validation/schemas";
@@ -11,62 +12,103 @@ export function RegisterFormInner({ mockMode }: { mockMode: boolean }) {
 
   if (mockMode) {
     return (
-      <Link href="/login" className="mt-4 block text-sm text-emerald-700">
-        חזרה להתחברות demo
+      <Link href="/login" className="block text-sm font-medium text-secondary hover:underline">
+        חזרה להתחברות במצב דמו
       </Link>
+    );
+  }
+
+  if (state.success) {
+    return (
+      <div className="space-y-4">
+        <FormMessage state={state} />
+        <Link href="/login" className="block text-sm font-medium text-secondary hover:underline">
+          לדף ההתחברות
+        </Link>
+      </div>
     );
   }
 
   return (
     <>
-      <form action={action} className="mt-6 space-y-4">
-        <FormMessage state={state} />
-        <input
-          name="fullName"
-          required
-          placeholder="שם מלא"
-          className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-        />
-        <input
-          name="email"
-          type="email"
-          required
-          placeholder="אימייל"
-          className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-        />
-        <input
-          name="password"
-          type="password"
-          required
-          minLength={8}
-          placeholder="סיסמה (לפחות 8 תווים)"
-          className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-        />
-        <select
-          name="residenceArea"
-          required
-          className="w-full rounded-xl border border-zinc-300 px-4 py-3"
-          defaultValue=""
-        >
-          <option value="" disabled>
+      <form action={action} className="space-y-4">
+        <div>
+          <label htmlFor="register-name" className={AUTH_LABEL}>
+            שם מלא
+          </label>
+          <input
+            id="register-name"
+            name="fullName"
+            required
+            minLength={2}
+            maxLength={100}
+            autoComplete="name"
+            className={AUTH_INPUT}
+          />
+        </div>
+        <div>
+          <label htmlFor="register-email" className={AUTH_LABEL}>
+            אימייל
+          </label>
+          <input
+            id="register-email"
+            name="email"
+            type="email"
+            required
+            maxLength={254}
+            autoComplete="email"
+            dir="ltr"
+            className={AUTH_INPUT}
+          />
+        </div>
+        <div>
+          <label htmlFor="register-password" className={AUTH_LABEL}>
+            סיסמה
+          </label>
+          <input
+            id="register-password"
+            name="password"
+            type="password"
+            required
+            minLength={10}
+            maxLength={72}
+            autoComplete="new-password"
+            dir="ltr"
+            aria-describedby="register-password-hint"
+            className={AUTH_INPUT}
+          />
+          <p id="register-password-hint" className="mt-1 text-xs text-on-surface-variant">
+            לפחות 10 תווים, כולל אות וספרה
+          </p>
+        </div>
+        <div>
+          <label htmlFor="register-area" className={AUTH_LABEL}>
             אזור מגורים
-          </option>
-          {RESIDENCE_AREAS.map((area) => (
-            <option key={area} value={area}>
-              {area}
+          </label>
+          <select
+            id="register-area"
+            name="residenceArea"
+            required
+            defaultValue=""
+            className={AUTH_INPUT}
+          >
+            <option value="" disabled>
+              בחר/י אזור
             </option>
-          ))}
-        </select>
-        <button
-          type="submit"
-          disabled={pending}
-          className="w-full rounded-xl bg-emerald-600 py-3 font-medium text-white disabled:opacity-60"
-        >
-          {pending ? "נרשם..." : "הירשם"}
+            {RESIDENCE_AREAS.map((area) => (
+              <option key={area} value={area}>
+                {area}
+              </option>
+            ))}
+          </select>
+        </div>
+        <FormMessage state={state} />
+        <button type="submit" disabled={pending} className={AUTH_BUTTON}>
+          {pending ? "נרשם..." : "הרשמה"}
         </button>
       </form>
-      <Link href="/login" className="mt-4 block text-sm text-emerald-700">
-        כבר יש לך חשבון? התחבר
+      <Link href="/login" className="mt-4 block text-sm font-medium text-secondary hover:underline">
+        כבר יש לך חשבון? התחברות
       </Link>
     </>
   );

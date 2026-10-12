@@ -1,25 +1,37 @@
-"use client";
+import type { Metadata } from "next";
 
-import { refreshProfileAction } from "@/lib/actions/auth";
+import { AuthCard } from "@/components/AuthCard";
+import { logoutAction, refreshProfileAction } from "@/lib/actions/auth";
+
+export const metadata: Metadata = {
+  title: "ממתין לאישור | שיתוף קהילתי",
+};
 
 export default function PendingApprovalPage() {
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-8 text-center">
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200">
-        <h1 className="text-2xl font-bold">ממתין לאישור אדמין</h1>
-        <p className="mt-3 text-zinc-600">
-          החשבון שלך נרשם בהצלחה. אדמין הקהילה יאשר אותך בקרוב ואז תוכל/י לגשת
-          לקטלוג ולהשאיל פריטים.
-        </p>
-        <form action={refreshProfileAction} className="mt-6">
+    <AuthCard title="ממתין לאישור אדמין">
+      <p className="font-body-md text-on-surface-variant">
+        החשבון שלך נרשם בהצלחה. אדמין הקהילה יאשר אותך בקרוב, ואז תוכל/י לגשת לקטלוג
+        ולהשאיל פריטים.
+      </p>
+      <div className="mt-6 flex flex-wrap gap-3">
+        <form action={refreshProfileAction}>
           <button
             type="submit"
-            className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-medium text-white"
+            className="rounded-xl bg-brand-mint px-5 py-2.5 font-bold text-brand-deep transition-all hover:opacity-90 active:scale-95"
           >
             בדוק שוב
           </button>
         </form>
+        <form action={logoutAction}>
+          <button
+            type="submit"
+            className="rounded-xl border border-secondary/40 px-5 py-2.5 font-medium text-secondary hover:bg-secondary/5"
+          >
+            יציאה
+          </button>
+        </form>
       </div>
-    </div>
+    </AuthCard>
   );
 }

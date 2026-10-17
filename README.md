@@ -1,35 +1,135 @@
-# Community Share
+# שיתוף קהילתי
 
-פלטפורמה קהילתית סגורה לניהול השאלת ציוד – Next.js + Supabase + Vercel.
+**הבעיה:** בכל קהילה יש ציוד יקר שנמצא בשימוש פעמיים בשנה – מקדחה, סולם, מזוודה גדולה, מיחם – ואין דרך
+מסודרת לדעת למי יש מה, מתי זה פנוי, ומי מחזיק מה כרגע.
 
-## Demo Mode (local development)
+**הפתרון:** פלטפורמה סגורה לקהילה אחת, שבה חברים מעלים פריטים להשאלה, מחפשים ציוד פנוי, שולחים בקשת
+השאלה לתאריכים מסוימים, ועוקבים אחרי ההחזרות – תחת פיקוח של אדמין הקהילה.
 
-1. Copy `.env.example` to `.env.local` (or use the included defaults)
-2. Ensure `USE_MOCK_DATA=true`
-3. `npm install && npm run dev`
-4. Open `/login` and pick a demo user:
-   - **אדמין** – full admin panel access
-   - **משתמש רגיל** – catalog, loans, items
-   - **ממתין לאישור** – pending approval screen only
+🔗 **האתר החי:** https://community-share-bice.vercel.app
 
-## Supabase Mode (production / later)
+## צילומי מסך
 
-1. Set `USE_MOCK_DATA=false` in `.env.local`
-2. Add Supabase URL and keys
-3. Run SQL migrations from `supabase/migrations/` (001 → 004)
-4. Configure Auth redirect: `{SITE_URL}/auth/callback`
-5. Promote first admin:
+| דף הבית | קטלוג | עמוד פריט ולוח תפוסות | פאנל אדמין |
+|---|---|---|---|
+| _להוסיף צילום_ | _להוסיף צילום_ | _להוסיף צילום_ | _להוסיף צילום_ |
 
-```sql
-UPDATE public.users SET role = 'admin', status = 'approved' WHERE email = 'your@email.com';
+## משתמשי דמו
+
+| תפקיד | אימייל | סיסמה |
+|---|---|---|
+| חברת קהילה (דנה כהן) | `demo.user@example.com` | נמסרת לבודקת בנפרד |
+| מנהלת קהילה (רחל אברהמי) | `demo.admin@example.com` | נמסרת לבודקת בנפרד |
+
+הקהילה באתר החי מלאה בנתוני דמו: 10 חברים, 21 פריטים (16 עם תמונות), השאלות בכל המצבים, שיחות בצ'אט,
+התראות ודיווחים. הם נוצרים בפקודה אחת ונמחקים בפקודה אחת:
+
+```bash
+node --env-file=.env.local --experimental-strip-types scripts/seed-demo.ts           # יצירה
+node --env-file=.env.local --experimental-strip-types scripts/seed-demo.ts --remove  # מחיקה
 ```
 
-## Architecture
+הכתובות כולן ב-`@example.com`, כך שאף אדם אמיתי לא מקבל מהן מייל. התמונות מ-Wikimedia Commons, והקרדיטים
+ב-[`scripts/demo-data/images/CREDITS.md`](scripts/demo-data/images/CREDITS.md).
 
-- **Repository layer** – [`lib/data/repository.ts`](lib/data/repository.ts) abstracts data access
-- **Mock** – [`lib/mock/`](lib/mock/) in-memory store for demo
-- **Supabase** – [`lib/supabase/`](lib/supabase/) for production (implement repository when switching)
+## מה אפשר לעשות
 
-## Security
+- **חבר קהילה:** הרשמה (ממתינה לאישור אדמין), חיפוש עם השלמה אוטומטית, סינון לפי קטגוריה, אזור וזמינות
+  בתאריכים, צפייה בלוח התפוסות של פריט, שליחת בקשת השאלה, מעקב אחרי ההשאלות וסימון החזרה.
+- **בעל פריט:** הוספה, עריכה ומחיקה של פריטים (עם תמונות, מצב 1–10, כמות ופיקדון), אישור או דחייה של
+  בקשות, סימון קבלת פיקדון ואישור החזרה.
+- **צ'אט פנימי:** שיחה אחת לכל פריט בין המתעניין/ת לבעל/ת הפריט, עם שיתוף תמונות. המערכת מוסיפה
+  לשיחה הודעות אוטומטיות על בקשה, אישור, דחייה והחזרה. רק שני הצדדים רואים את השיחה.
+- **התראות בתוך האתר:** פעמון עם מונה, שמתעדכן בזמן אמת: בקשות חדשות, אישורים ודחיות, תזכורות
+  החזרה, איחורים והודעות חדשות.
+- **דיווחים:** דיווח על בעיה בפריט או על משתמש. הדיווח מגיע לאדמין בלבד, והמדווח/ת רואה את סטטוס הטיפול.
+- **אדמין:** אישור משתמשים ופריטים חדשים, חסימה ושחרור של משתמשים, הסרת פריט מהקטלוג, מעקב אחרי
+  השאלות פעילות ובאיחור וסגירת השאלה תקועה, טיפול בדיווחים, סטטיסטיקות, יומן פעולות אדמין ויומן מיילים.
+- **מיילים אוטומטיים (Resend):** בקשה חדשה, אישור ודחייה, אישור משתמש ופריט, תזכורת יום לפני מועד
+  ההחזרה, והודעת איחור.
 
-See [`SECURITY.md`](SECURITY.md) for production security checklist (RLS, validation, secrets).
+## טכנולוגיות
+
+| שכבה | טכנולוגיה |
+|---|---|
+| ממשק | Next.js 16 (App Router), React 19, Tailwind CSS 4, עברית ו-RTL |
+| שרת | Server Actions ו-Route Handler אחד (המשימה היומית) |
+| מסד נתונים | Supabase – PostgreSQL עם Row Level Security |
+| אימות | Supabase Auth (אימייל וסיסמה, אימות כתובת) |
+| קבצים | Supabase Storage – bucket פרטי עם קישורים חתומים |
+| זמן אמת | Supabase Realtime (האזנה בלבד, תחת RLS) |
+| מיילים | Resend |
+| פריסה ותזמון | Vercel, Vercel Cron |
+
+## ארכיטקטורה
+
+```
+דפדפן
+  │  (כל קריאה וכתיבה של נתונים עוברת דרך השרת. החיבור הישיר היחיד של הדפדפן
+  │   הוא האזנה ל-Supabase Realtime, שמשמשת רק כאות "משהו השתנה, רענן")
+  ▼
+proxy.ts ── רענון סשן, חסימת נתיבים לפי סטטוס ותפקיד, CSP עם nonce
+  ▼
+דפים (Server Components) ── קריאת נתונים דרך ה-Repository
+Server Actions ── בדיקת משתמש ← ולידציה (Zod) ← הגבלת קצב ← Repository ← מייל
+  ▼
+Repository (lib/data) ── ממשק אחד, שני מימושים: Supabase (פרודקשן) ו-Mock (דמו מקומי)
+  ▼
+Supabase ── טבלאות לקריאה בלבד תחת RLS; כל כתיבה היא פונקציית מסד שבודקת מי הקורא
+```
+
+מסמכים נוספים בתיקיית [`docs/`](docs/):
+[מודל הנתונים](docs/DATA_MODEL.md) · [ERD](docs/ERD.md) · [הרשאות RLS](docs/RLS.md) ·
+[חיבורים חיצוניים](docs/INTEGRATIONS.md) · [תרשימי זרימה](docs/FLOWS.md) ·
+[תוכנית בדיקות](docs/TEST_PLAN.md) · [אבטחה](SECURITY.md)
+
+## התקנה והרצה
+
+דרוש Node.js 20 ומעלה.
+
+```bash
+npm install
+cp .env.example .env.local
+npm run dev
+```
+
+עם `USE_MOCK_DATA=true` (ברירת המחדל ב-`.env.example`) האתר רץ על נתוני דמו בזיכרון, בלי מסד נתונים:
+נכנסים ל-`/login` ובוחרים משתמש דמו.
+
+### הרצה מול Supabase
+
+1. ליצור פרויקט Supabase ולהריץ את הקבצים שב-`supabase/migrations/` לפי הסדר (001 עד 006).
+2. למלא את משתני הסביבה (ראו למטה) ולהגדיר `USE_MOCK_DATA=false`.
+3. ב-Supabase ← Authentication ← URL Configuration: להגדיר Site URL, ולהוסיף את
+   `{SITE_URL}/auth/callback` ל-Redirect URLs.
+4. להירשם באתר, ואז להפוך את החשבון הראשון לאדמין (פעם אחת):
+   ```sql
+   UPDATE public.users SET role = 'admin', status = 'approved' WHERE email = 'you@example.com';
+   ```
+5. לנתוני דמו: `node --env-file=.env.local --experimental-strip-types scripts/create-demo-users.ts`
+   ואז להריץ את `supabase/seed.sql`.
+
+## משתני סביבה
+
+| משתנה | סודי? | תיאור |
+|---|---|---|
+| `USE_MOCK_DATA` | לא | `true` למצב דמו בלי מסד נתונים |
+| `NEXT_PUBLIC_SITE_URL` | לא | כתובת האתר, לקישורים במיילים |
+| `NEXT_PUBLIC_SUPABASE_URL` | לא | כתובת פרויקט Supabase |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | לא | מפתח ציבורי; ההגנה היא ב-RLS |
+| `SUPABASE_SERVICE_ROLE_KEY` | **כן** | צד שרת בלבד: הגבלת קצב, מיילים, משימה יומית |
+| `RESEND_API_KEY` | **כן** | צד שרת בלבד. בלעדיו המיילים מדולגים ונרשמים ביומן כ"דולג" |
+| `EMAIL_FROM` | לא | כתובת השולח, מדומיין מאומת ב-Resend |
+| `CRON_SECRET` | **כן** | מגן על `/api/cron/daily` |
+
+שום סוד לא נמצא בקוד או ב-git; קובצי `.env*` מוחרגים ב-`.gitignore`.
+
+## בדיקות
+
+```bash
+npm run lint
+npx tsc --noEmit
+npm run build
+```
+
+בדיקות ידניות למסלול המרכזי ולניסיונות גישה לא מורשים: [`docs/TEST_PLAN.md`](docs/TEST_PLAN.md).

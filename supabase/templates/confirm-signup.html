@@ -1,0 +1,25 @@
+<!--
+  Supabase → Authentication → Emails → Templates → "Confirm signup".
+  Subject: אימות כתובת האימייל – שיתוף קהילתי
+  Paste everything below this comment into the "Message body" field.
+-->
+<div dir="rtl" style="background:#eef6f5;padding:32px 16px;font-family:Arial,Helvetica,sans-serif;">
+  <div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #d7e3e8;">
+    <div style="background:#43637e;padding:20px 24px;">
+      <p style="margin:0;color:#ffffff;font-size:20px;font-weight:bold;">שיתוף קהילתי</p>
+    </div>
+    <div style="padding:28px 24px;color:#1b3247;font-size:16px;line-height:1.6;text-align:right;">
+      <h1 style="margin:0 0 16px;font-size:22px;color:#1b3247;">רק עוד צעד אחד</h1>
+      <p style="margin:0 0 12px;">תודה שנרשמת לשיתוף קהילתי – המקום שבו שכנים משאילים זה לזה ציוד.</p>
+      <p style="margin:0 0 24px;">כדי לוודא שהכתובת הזו שלך, נא ללחוץ על הכפתור:</p>
+      <p style="margin:0 0 24px;text-align:center;">
+        <a href="{{ .ConfirmationURL }}"
+           style="display:inline-block;background:#65dcd5;color:#1b3247;text-decoration:none;font-weight:bold;padding:14px 32px;border-radius:12px;">
+          אימות כתובת האימייל
+        </a>
+      </p>
+      <p style="margin:0 0 12px;">אחרי האימות, מנהל/ת הקהילה יאשר/ו את החשבון, ונשלח לך הודעה כשאפשר להתחיל.</p>
+      <p style="margin:0;color:#5f6f7a;font-size:13px;">לא נרשמת? אפשר להתעלם מההודעה הזו, ושום חשבון לא ייפתח.</p>
+    </div>
+  </div>
+</div>

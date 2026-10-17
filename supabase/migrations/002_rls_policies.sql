@@ -1,11 +1,15 @@
--- RLS helper functions and policies
+-- Row Level Security.
+--
+-- Model: default deny. Clients may only SELECT (filtered by the policies below).
+-- Every write goes through a SECURITY DEFINER function in 003_functions.sql,
+-- so there are deliberately no INSERT/UPDATE/DELETE policies.
 
 CREATE OR REPLACE FUNCTION public.is_admin()
 RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users
@@ -20,7 +24,7 @@ RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.users
@@ -34,12 +38,28 @@ RETURNS BOOLEAN
 LANGUAGE sql
 STABLE
 SECURITY DEFINER
-SET search_path = public
+SET search_path = ''
 AS $$
   SELECT EXISTS (
     SELECT 1 FROM public.items
     WHERE id = p_item_id
       AND owner_id = auth.uid()
+  );
+$$;
+
+-- Lets a borrower keep seeing an item they have a request on, even if the item
+-- later leaves the public catalog (e.g. it went back to admin review).
+CREATE OR REPLACE FUNCTION public.has_request_on_item(p_item_id UUID)
+RETURNS BOOLEAN
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path = ''
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.borrow_requests
+    WHERE item_id = p_item_id
+      AND requester_id = auth.uid()
   );
 $$;
 
@@ -49,175 +69,89 @@ ALTER TABLE public.items ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.item_images ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.borrow_requests ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.loans ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.admin_audit_log ENABLE ROW LEVEL SECURITY;
+-- No policies at all: only the service role (which bypasses RLS) can touch it.
+ALTER TABLE public.rate_limits ENABLE ROW LEVEL SECURITY;
 
--- users
-CREATE POLICY users_select_own ON public.users
+-- users: a user reads only their own row; admins read everyone.
+CREATE POLICY users_select ON public.users
   FOR SELECT TO authenticated
   USING (id = auth.uid() OR public.is_admin());
 
-CREATE POLICY users_update_own_profile ON public.users
-  FOR UPDATE TO authenticated
-  USING (id = auth.uid())
-  WITH CHECK (
-    id = auth.uid()
-    AND role = (SELECT role FROM public.users WHERE id = auth.uid())
-    AND status = (SELECT status FROM public.users WHERE id = auth.uid())
-  );
-
-CREATE POLICY users_admin_update ON public.users
-  FOR UPDATE TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
-
 -- categories
-CREATE POLICY categories_select_approved ON public.categories
+CREATE POLICY categories_select ON public.categories
   FOR SELECT TO authenticated
-  USING (public.is_approved_user() OR public.is_admin());
-
-CREATE POLICY categories_admin_all ON public.categories
-  FOR ALL TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
+  USING (public.is_approved_user());
 
 -- items
-CREATE POLICY items_select_catalog ON public.items
+CREATE POLICY items_select ON public.items
   FOR SELECT TO authenticated
   USING (
-    (approval_status = 'approved' AND public.is_approved_user())
-    OR owner_id = auth.uid()
-    OR public.is_admin()
+    public.is_approved_user()
+    AND (
+      approval_status = 'approved'
+      OR owner_id = auth.uid()
+      OR public.has_request_on_item(id)
+      OR public.is_admin()
+    )
   );
-
-CREATE POLICY items_insert_own ON public.items
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    owner_id = auth.uid()
-    AND public.is_approved_user()
-    AND approval_status = 'pending'
-  );
-
-CREATE POLICY items_update_own ON public.items
-  FOR UPDATE TO authenticated
-  USING (owner_id = auth.uid() AND public.is_approved_user())
-  WITH CHECK (
-    owner_id = auth.uid()
-    AND approval_status = (SELECT approval_status FROM public.items WHERE id = items.id)
-  );
-
-CREATE POLICY items_admin_update ON public.items
-  FOR UPDATE TO authenticated
-  USING (public.is_admin())
-  WITH CHECK (public.is_admin());
-
-CREATE POLICY items_delete_own ON public.items
-  FOR DELETE TO authenticated
-  USING (owner_id = auth.uid() AND public.is_approved_user());
 
 -- item_images
 CREATE POLICY item_images_select ON public.item_images
   FOR SELECT TO authenticated
   USING (
-    EXISTS (
-      SELECT 1 FROM public.items i
-      WHERE i.id = item_images.item_id
-        AND (
-          (i.approval_status = 'approved' AND public.is_approved_user())
-          OR i.owner_id = auth.uid()
-          OR public.is_admin()
-        )
-    )
+    EXISTS (SELECT 1 FROM public.items i WHERE i.id = item_images.item_id)
   );
 
-CREATE POLICY item_images_insert ON public.item_images
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.items i
-      WHERE i.id = item_images.item_id
-        AND i.owner_id = auth.uid()
-        AND public.is_approved_user()
-    )
-  );
-
-CREATE POLICY item_images_delete ON public.item_images
-  FOR DELETE TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.items i
-      WHERE i.id = item_images.item_id
-        AND i.owner_id = auth.uid()
-    )
-  );
-
--- borrow_requests
+-- borrow_requests: only the two parties and admins.
 CREATE POLICY borrow_requests_select ON public.borrow_requests
   FOR SELECT TO authenticated
   USING (
-    requester_id = auth.uid()
-    OR public.is_item_owner(item_id)
-    OR public.is_admin()
+    public.is_approved_user()
+    AND (
+      requester_id = auth.uid()
+      OR public.is_item_owner(item_id)
+      OR public.is_admin()
+    )
   );
 
-CREATE POLICY borrow_requests_insert ON public.borrow_requests
-  FOR INSERT TO authenticated
-  WITH CHECK (
-    requester_id = auth.uid()
-    AND public.is_approved_user()
-    AND status = 'pending'
-  );
-
-CREATE POLICY borrow_requests_update_owner ON public.borrow_requests
-  FOR UPDATE TO authenticated
-  USING (public.is_item_owner(item_id) AND public.is_approved_user())
-  WITH CHECK (public.is_item_owner(item_id));
-
-CREATE POLICY borrow_requests_update_requester ON public.borrow_requests
-  FOR UPDATE TO authenticated
-  USING (requester_id = auth.uid())
-  WITH CHECK (requester_id = auth.uid());
-
--- loans
+-- loans: visible exactly when the parent request is visible.
 CREATE POLICY loans_select ON public.loans
   FOR SELECT TO authenticated
   USING (
     EXISTS (
       SELECT 1 FROM public.borrow_requests br
       WHERE br.id = loans.borrow_request_id
-        AND (
-          br.requester_id = auth.uid()
-          OR public.is_item_owner(br.item_id)
-          OR public.is_admin()
-        )
     )
   );
 
-CREATE POLICY loans_insert ON public.loans
-  FOR INSERT TO authenticated
-  WITH CHECK (public.is_item_owner(
-    (SELECT item_id FROM public.borrow_requests WHERE id = borrow_request_id)
-  ));
+-- admin_audit_log
+CREATE POLICY admin_audit_log_select ON public.admin_audit_log
+  FOR SELECT TO authenticated
+  USING (public.is_admin());
 
-CREATE POLICY loans_update ON public.loans
-  FOR UPDATE TO authenticated
-  USING (
-    EXISTS (
-      SELECT 1 FROM public.borrow_requests br
-      WHERE br.id = loans.borrow_request_id
-        AND (
-          br.requester_id = auth.uid()
-          OR public.is_item_owner(br.item_id)
-          OR public.is_admin()
-        )
-    )
-  )
-  WITH CHECK (
-    EXISTS (
-      SELECT 1 FROM public.borrow_requests br
-      WHERE br.id = loans.borrow_request_id
-        AND (
-          br.requester_id = auth.uid()
-          OR public.is_item_owner(br.item_id)
-          OR public.is_admin()
-        )
-    )
-  );
+-- Minimal public profile of approved members (name + area only, never email).
+-- The view runs with its owner's rights on purpose, so it can read past the
+-- users policy while exposing only these columns to approved members.
+CREATE VIEW public.public_profiles
+WITH (security_invoker = false, security_barrier = true) AS
+  SELECT u.id, u.full_name, u.residence_area
+  FROM public.users u
+  WHERE u.status = 'approved'
+    AND public.is_approved_user();
+
+-- Table privileges: nothing for anonymous visitors, read-only for signed-in users.
+REVOKE ALL ON ALL TABLES IN SCHEMA public FROM PUBLIC, anon, authenticated;
+
+GRANT SELECT ON
+  public.users,
+  public.categories,
+  public.items,
+  public.item_images,
+  public.borrow_requests,
+  public.loans,
+  public.admin_audit_log,
+  public.public_profiles
+TO authenticated;
+
+ALTER DEFAULT PRIVILEGES IN SCHEMA public REVOKE ALL ON TABLES FROM anon, authenticated;

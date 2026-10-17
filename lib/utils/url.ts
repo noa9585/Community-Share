@@ -1,39 +1,62 @@
 import { isMockMode } from "@/lib/config";
 
-const ALLOWED_IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"] as const;
-export const MAX_IMAGE_SIZE_BYTES = 5 * 1024 * 1024;
-
+/**
+ * Only render an image when its URL points at our own storage. This keeps a
+ * stored value from ever turning into a `javascript:` URL or a tracking pixel.
+ */
 export function isValidStorageUrl(url: string): boolean {
-  if (!url || url.toLowerCase().startsWith("javascript:")) {
+  if (!url) return false;
+
+  let parsed: URL;
+  try {
+    parsed = new URL(url);
+  } catch {
     return false;
   }
 
+  if (parsed.protocol !== "https:") return false;
+
   if (isMockMode()) {
-    try {
-      const parsed = new URL(url);
-      return parsed.protocol === "https:" || url.startsWith("/mock/");
-    } catch {
-      return false;
-    }
+    return parsed.hostname === "picsum.photos";
   }
 
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   if (!supabaseUrl) return false;
 
   try {
-    const parsed = new URL(url);
-    const allowed = new URL(supabaseUrl);
-    return parsed.origin === allowed.origin;
+    return parsed.origin === new URL(supabaseUrl).origin;
   } catch {
     return false;
   }
 }
 
-export function isAllowedImageType(type: string): boolean {
-  return ALLOWED_IMAGE_TYPES.includes(type as (typeof ALLOWED_IMAGE_TYPES)[number]);
+/** The item's first picture, if it has one that is safe to render. */
+export function firstImageUrl(
+  item?: { item_images?: { url: string }[] } | null,
+): string | null {
+  const url = item?.item_images?.[0]?.url;
+  return url && isValidStorageUrl(url) ? url : null;
 }
 
-export function buildStoragePath(userId: string, itemId: string): string {
-  const uuid = crypto.randomUUID();
-  return `${userId}/${itemId}/${uuid}.webp`;
+/**
+ * Returns a same-site path to redirect to, or the fallback. Rejects anything
+ * that a browser could resolve to another origin (`//evil.com`, `/\evil.com`,
+ * `@evil.com`, absolute URLs), which would otherwise be an open redirect.
+ */
+export function safeRedirectPath(value: unknown, fallback = "/"): string {
+  if (typeof value !== "string" || value.length === 0 || value.length > 512) {
+    return fallback;
+  }
+  if (!value.startsWith("/") || value.startsWith("//") || /[\\\u0000-\u001f]/.test(value)) {
+    return fallback;
+  }
+
+  try {
+    const base = "http://localhost";
+    const parsed = new URL(value, base);
+    if (parsed.origin !== base) return fallback;
+    return `${parsed.pathname}${parsed.search}`;
+  } catch {
+    return fallback;
+  }
 }

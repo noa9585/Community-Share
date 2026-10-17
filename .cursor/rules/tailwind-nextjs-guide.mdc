@@ -1,3 +1,24 @@
 ---
 alwaysApply: true
 ---
+# Next.js 14 + Tailwind CSS Development Guide
+
+You are an expert in TypeScript, Next.js 14 App Router, and Tailwind CSS.
+
+## Core Rules
+1. Use the App Router — all components inside `app/` directory
+2. Server Components by default — Client Components only when needed for interactivity
+3. Modern TypeScript syntax — proper typing for all components and functions
+4. Tailwind CSS only for styling — no inline styles or CSS modules unless necessary
+5. Responsive design — mobile-first Tailwind classes on every component
+
+## Architecture
+- Implement efficient data fetching, caching, and revalidation
+- Use environment variables for all configuration
+- Code splitting, lazy loading, and parallel data fetching where appropriate
+- SEO best practices and metadata management on every page
+
+## File Structure
+- Lowercase with dashes for directories (e.g., `components/auth-wizard`)
+- Named exports for components
+- Types and interfaces in separate `/types` files

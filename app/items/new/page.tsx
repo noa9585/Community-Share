@@ -1,8 +1,8 @@
 import type { Metadata } from "next";
 
 import { AppNav } from "@/components/AppNav";
-import { NewItemForm } from "@/components/NewItemForm";
-import { getCurrentUser } from "@/lib/auth/session";
+import { ItemForm } from "@/components/ItemForm";
+import { requirePageUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
@@ -10,22 +10,22 @@ export const metadata: Metadata = {
 };
 
 export default async function NewItemPage() {
-  const user = await getCurrentUser();
+  const user = await requirePageUser();
   const repo = await getRepository();
-  const categories = await repo.getCategories();
+  const [categories, areas] = await Promise.all([repo.getCategories(), repo.getAreas()]);
 
   return (
-    <AppNav user={user} activePath="/my-items" title="הוספת פריט">
+    <AppNav user={user} activePath="/my-items" headerTitle="הוספת פריט">
       <div className="mx-auto max-w-3xl">
         <div className="mb-stack-lg">
-          <h2 className="font-headline mb-2 text-3xl text-brand-deep">
-            שתפו פריט חדש עם השכנים
-          </h2>
-          <p className="text-on-surface-variant">
-            עזרו לבנות קהילה חזקה יותר על ידי השאלת חפצים שאינכם משתמשים בהם ביום-יום.
+          <h1 className="mb-2 font-headline-md text-headline-md-mobile text-brand-deep md:text-headline-md">
+            שתפו פריט חדש עם הקהילה
+          </h1>
+          <p className="font-body-md text-on-surface-variant">
+            הפריט יופיע בקטלוג לאחר אישור אדמין הקהילה.
           </p>
         </div>
-        <NewItemForm categories={categories} />
+        <ItemForm categories={categories} areas={areas.map((area) => area.name)} />
       </div>
     </AppNav>
   );

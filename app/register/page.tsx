@@ -1,26 +1,30 @@
 import type { Metadata } from "next";
 
+import { AuthCard } from "@/components/AuthCard";
 import { RegisterFormInner } from "@/components/RegisterFormInner";
 import { isMockMode } from "@/lib/config";
+import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
-  title: "הרשמה | Community Share",
+  title: "הרשמה | שיתוף קהילתי",
 };
 
-export default function RegisterPage() {
+export default async function RegisterPage() {
   const mockMode = isMockMode();
+  const areas = await (await getRepository()).getAreas();
 
   return (
-    <div className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-4 py-8">
-      <div className="rounded-3xl bg-white p-6 shadow-sm ring-1 ring-zinc-200">
-        <h1 className="text-2xl font-bold">הרשמה</h1>
-        {mockMode && (
-          <p className="mt-2 text-sm text-amber-700">
-            מצב דמו – השתמש/י בדף ההתחברות לבחירת משתמש demo
-          </p>
-        )}
-        <RegisterFormInner mockMode={mockMode} />
-      </div>
-    </div>
+    <AuthCard title="הרשמה">
+      {mockMode ? (
+        <p className="mb-4 text-sm text-on-surface-variant">
+          מצב דמו – ההרשמה אינה פעילה. השתמש/י בדף ההתחברות לבחירת משתמש.
+        </p>
+      ) : (
+        <p className="mb-4 text-sm text-on-surface-variant">
+          הקהילה סגורה: לאחר ההרשמה ואימות האימייל, אדמין יאשר את החשבון.
+        </p>
+      )}
+      <RegisterFormInner mockMode={mockMode} areas={areas.map((area) => area.name)} />
+    </AuthCard>
   );
 }

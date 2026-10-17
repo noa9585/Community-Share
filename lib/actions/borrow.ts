@@ -5,6 +5,13 @@ import { revalidatePath } from "next/cache";
 import { requireApprovedUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
 import {
+  notifyRequestCreated,
+  notifyRequestDecision,
+  notifyReturnMarked,
+} from "@/lib/email/notify";
+import { messageForError } from "@/lib/errors";
+import { enforceRateLimit } from "@/lib/security/rate-limit";
+import {
   borrowActionSchema,
   borrowRequestSchema,
   loanActionSchema,
@@ -28,26 +35,21 @@ export async function createBorrowRequestAction(
     return { error: parsed.error.issues[0]?.message ?? "קלט לא תקין" };
   }
 
-  const repo = await getRepository();
-  const available = await repo.checkItemAvailability(
-    parsed.data.itemId,
-    parsed.data.startDate,
-    parsed.data.endDate,
-    parsed.data.requestedQuantity,
-  );
-
-  if (!available) {
-    return { error: "הפריט אינו זמין בתאריכים או בכמות המבוקשת" };
-  }
-
+  let requestId: string;
   try {
-    await repo.createBorrowRequest(user.id, parsed.data);
+    await enforceRateLimit("borrowRequest", user.id);
+    const repo = await getRepository();
+    // Availability, ownership and date rules are re-checked inside the database.
+    const { id } = await repo.createBorrowRequest(user.id, parsed.data);
+    requestId = id;
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "שגיאה בשליחת הבקשה" };
+    return { error: messageForError(error, "שגיאה בשליחת הבקשה") };
   }
+
+  await notifyRequestCreated(requestId);
 
   revalidatePath("/my-loans");
-  revalidatePath(`/items/${parsed.data.itemId}`);
+  revalidatePath("/");
   return { success: "בקשת ההשאלה נשלחה לבעל הפריט" };
 }
 
@@ -66,21 +68,29 @@ export async function handleBorrowRequestAction(
     return { error: "קלט לא תקין" };
   }
 
-  const repo = await getRepository();
+  const { requestId, action } = parsed.data;
 
   try {
-    if (parsed.data.action === "approve") {
-      await repo.approveBorrowRequest(parsed.data.requestId, user.id);
+    await enforceRateLimit("mutation", user.id);
+    const repo = await getRepository();
+    if (action === "approve") {
+      await repo.approveBorrowRequest(requestId, user.id);
+    } else if (action === "reject") {
+      await repo.rejectBorrowRequest(requestId, user.id);
     } else {
-      await repo.rejectBorrowRequest(parsed.data.requestId, user.id);
+      await repo.cancelBorrowRequest(requestId, user.id);
     }
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "שגיאה בעדכון הבקשה" };
+    return { error: messageForError(error, "שגיאה בעדכון הבקשה") };
   }
 
-  revalidatePath("/my-items");
-  revalidatePath("/my-loans");
-  return { success: parsed.data.action === "approve" ? "הבקשה אושרה" : "הבקשה נדחתה" };
+  if (action !== "cancel") {
+    await notifyRequestDecision(requestId, action === "approve");
+  }
+
+  revalidatePath("/", "layout");
+  const messages = { approve: "הבקשה אושרה", reject: "הבקשה נדחתה", cancel: "הבקשה בוטלה" };
+  return { success: messages[action] };
 }
 
 export async function handleLoanAction(
@@ -98,22 +108,26 @@ export async function handleLoanAction(
     return { error: "קלט לא תקין" };
   }
 
-  const repo = await getRepository();
+  const { loanId, action } = parsed.data;
 
   try {
-    if (parsed.data.action === "mark_returned") {
-      await repo.markLoanReturned(parsed.data.loanId, user.id);
-    } else if (parsed.data.action === "confirm_return") {
-      await repo.confirmLoanReturn(parsed.data.loanId, user.id);
-    } else if (parsed.data.action === "mark_deposit_received") {
-      await repo.markDepositReceived(parsed.data.loanId);
+    await enforceRateLimit("mutation", user.id);
+    const repo = await getRepository();
+    if (action === "mark_returned") {
+      await repo.markLoanReturned(loanId, user.id);
+    } else if (action === "confirm_return") {
+      await repo.confirmLoanReturn(loanId, user.id);
+    } else {
+      await repo.markDepositReceived(loanId, user.id);
     }
   } catch (error) {
-    return { error: error instanceof Error ? error.message : "שגיאה בביצוע הפעולה" };
+    return { error: messageForError(error, "שגיאה בביצוע הפעולה") };
   }
 
-  revalidatePath("/my-loans");
-  revalidatePath("/my-items");
-  revalidatePath("/admin");
+  if (action === "mark_returned") {
+    await notifyReturnMarked(loanId);
+  }
+
+  revalidatePath("/", "layout");
   return { success: "הפעולה בוצעה בהצלחה" };
 }

@@ -288,6 +288,13 @@ export async function runDailyNotifications(today: string, tomorrow: string): Pr
   if (late.error) throw new Error("cron_mark_late_loans failed");
   result.newlyLate = ((late.data ?? []) as string[]).length;
 
+  // The in-app twin of the reminder e-mail below. Overdue notices need no call
+  // here: the database writes them when a loan turns late.
+  const reminders = await admin.rpc("cron_create_return_reminders");
+  if (reminders.error) {
+    console.error("[community-share] in-app reminders failed", reminders.error.message);
+  }
+
   for (const context of await loadOpenLoans("active", (row) => row.end_date === tomorrow)) {
     if (!context.loanId) continue;
     const outcome = await sendEmail({

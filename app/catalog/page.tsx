@@ -5,11 +5,7 @@ import { AppNav } from "@/components/AppNav";
 import { CatalogItemCard } from "@/components/ItemCard";
 import { requirePageUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";
-import {
-  RESIDENCE_AREAS,
-  catalogFiltersSchema,
-  todayInIsrael,
-} from "@/lib/validation/schemas";
+import { catalogFiltersSchema, todayInIsrael } from "@/lib/validation/schemas";
 
 export const metadata: Metadata = {
   title: "קטלוג | שיתוף קהילתי",
@@ -41,9 +37,10 @@ export default async function CatalogPage({
   });
 
   const repo = await getRepository();
-  const [items, categories] = await Promise.all([
+  const [items, categories, areas] = await Promise.all([
     repo.getCatalogItems(filters),
     repo.getCategories(),
+    repo.getAreas(),
   ]);
 
   const today = todayInIsrael();
@@ -84,9 +81,9 @@ export default async function CatalogPage({
                 className={FIELD}
               >
                 <option value="">כל האזורים</option>
-                {RESIDENCE_AREAS.map((area) => (
-                  <option key={area} value={area}>
-                    {area}
+                {areas.map((area) => (
+                  <option key={area.id} value={area.name}>
+                    {area.name}
                   </option>
                 ))}
               </select>

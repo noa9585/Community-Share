@@ -21,6 +21,8 @@ export const LIMITS = {
   itemWrite: { max: 30, windowSeconds: 60 * 60 },
   borrowRequest: { max: 30, windowSeconds: 60 * 60 },
   mutation: { max: 120, windowSeconds: 60 },
+  chatMessage: { max: 40, windowSeconds: 60 },
+  report: { max: 10, windowSeconds: 60 * 60 },
 } as const satisfies Record<string, Limit>;
 
 export type LimitName = keyof typeof LIMITS;

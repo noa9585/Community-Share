@@ -5,9 +5,16 @@ import { AppError } from "@/lib/errors";
 import { createClient } from "@/lib/supabase/server";
 import type {
   AdminDashboard,
+  AdminStats,
+  AppNotification,
+  Area,
+  AuditLogEntry,
   BorrowRequest,
   BorrowRequestWithRelations,
   Category,
+  ChatMessage,
+  ConversationDetail,
+  ConversationSummary,
   EmailLogEntry,
   HomeDashboard,
   Item,
@@ -15,6 +22,10 @@ import type {
   ItemWithRelations,
   Loan,
   LoanWithRelations,
+  Report,
+  ReportWithRelations,
+  TaxonomyUsage,
+  UnreadCounts,
   User,
 } from "@/types/database";
 
@@ -25,6 +36,7 @@ import type {
 type Supabase = Awaited<ReturnType<typeof createClient>>;
 
 const BUCKET = "item-images";
+const CHAT_BUCKET = "chat-images";
 const SIGNED_URL_TTL_SECONDS = 60 * 60;
 const GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -34,6 +46,10 @@ const ITEM_SELECT =
   "id, owner_id, name, description, category_id, condition_rating, total_quantity, " +
   "available_quantity, deposit_amount, area, approval_status, created_at, " +
   "category:categories(id, name, icon), item_images(id, item_id, storage_path, sort_order, created_at)";
+
+const REPORT_SELECT =
+  "id, reporter_id, target_type, item_id, reported_user_id, target_label, reason, details, " +
+  "status, admin_note, handled_at, created_at";
 
 const REQUEST_SELECT =
   "id, item_id, requester_id, start_date, end_date, requested_quantity, status, created_at, " +
@@ -56,6 +72,17 @@ type ItemRow = Omit<Item, "category" | "item_images" | "owner"> & {
 type RequestRow = BorrowRequest & {
   loan: Loan | Loan[] | null;
   item: ItemRow | ItemRow[] | null;
+};
+
+type ConversationRow = {
+  id: string;
+  item_id: string;
+  owner_id: string;
+  member_id: string;
+  last_message_at: string;
+  last_kind: string;
+  last_body: string;
+  unread_count: number;
 };
 
 type DbError = { message: string; code?: string };
@@ -92,12 +119,16 @@ function escapeLike(term: string): string {
   return term.replace(/[\\%_]/g, "\\$&");
 }
 
-async function signPaths(supabase: Supabase, paths: string[]): Promise<Map<string, string>> {
+async function signPaths(
+  supabase: Supabase,
+  paths: string[],
+  bucket = BUCKET,
+): Promise<Map<string, string>> {
   const signed = new Map<string, string>();
   if (paths.length === 0) return signed;
 
   const { data, error } = await supabase.storage
-    .from(BUCKET)
+    .from(bucket)
     .createSignedUrls(paths, SIGNED_URL_TTL_SECONDS);
 
   if (error || !data) return signed;
@@ -288,6 +319,13 @@ export const supabaseRepository: DataRepository = {
     );
   },
 
+  async getAreas(): Promise<Area[]> {
+    const supabase = await createClient();
+    return assertRead<Area[]>(
+      await supabase.from("areas").select("id, name").order("sort_order").order("name"),
+    );
+  },
+
   async getHomeDashboard(userId): Promise<HomeDashboard> {
     const supabase = await createClient();
     await refreshLateLoans(supabase);
@@ -467,7 +505,7 @@ export const supabaseRepository: DataRepository = {
     const supabase = await createClient();
     await refreshLateLoans(supabase);
 
-    const [userRows, itemRows, loanRows] = await Promise.all([
+    const [userRows, itemRows, loanRows, reportRows, auditRows, statsResult] = await Promise.all([
       supabase
         .from("users")
         .select(USER_SELECT)
@@ -476,17 +514,28 @@ export const supabaseRepository: DataRepository = {
       supabase
         .from("items")
         .select(ITEM_SELECT)
-        .eq("approval_status", "pending")
-        .order("created_at", { ascending: true })
-        .limit(100),
+        .order("created_at", { ascending: false })
+        .limit(300),
       supabase
         .from("loans")
         .select("borrow_request_id")
         .in("status", ["active", "late", "returned_pending_confirmation"])
         .limit(300),
+      supabase
+        .from("reports")
+        .select(REPORT_SELECT)
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase
+        .from("admin_audit_log")
+        .select("id, admin_id, action, target_type, created_at")
+        .order("created_at", { ascending: false })
+        .limit(30),
+      supabase.rpc("admin_stats"),
     ]);
 
     const users = assertRead<User[]>(userRows);
+    const usersById = new Map(users.map((user) => [user.id, user]));
     const openRequestIds = assertRead<{ borrow_request_id: string }[]>(loanRows).map(
       (row) => row.borrow_request_id,
     );
@@ -501,20 +550,44 @@ export const supabaseRepository: DataRepository = {
         )
       : [];
 
-    const [pendingItems, requests] = await Promise.all([
+    const [items, requests] = await Promise.all([
       hydrateItems(supabase, assertRead<ItemRow[]>(itemRows as never), { nameSource: "users" }),
       hydrateRequests(supabase, requestRows, { nameSource: "users" }),
     ]);
 
+    const reports = assertRead<Report[]>(reportRows as never).map(
+      (report): ReportWithRelations => {
+        const reported = report.reported_user_id ? usersById.get(report.reported_user_id) : null;
+        return {
+          ...report,
+          reporter_name: usersById.get(report.reporter_id)?.full_name ?? null,
+          reported_user_name: reported?.full_name ?? null,
+          reported_user_status: reported?.status ?? null,
+        };
+      },
+    );
+
+    const auditLog = assertRead<(Omit<AuditLogEntry, "admin_name"> & { admin_id: string | null })[]>(
+      auditRows,
+    ).map(({ admin_id, ...entry }) => ({
+      ...entry,
+      admin_name: admin_id ? (usersById.get(admin_id)?.full_name ?? null) : null,
+    }));
+
     return {
       pendingUsers: users.filter((user) => user.status === "pending"),
       users,
-      pendingItems,
+      // Oldest first: the item that has waited longest is reviewed first.
+      pendingItems: items.filter((item) => item.approval_status === "pending").reverse(),
+      items,
       activeLoans: [
         ...loansFromRequests(requests, "active"),
         ...loansFromRequests(requests, "returned_pending_confirmation"),
       ],
       lateLoans: loansFromRequests(requests, "late"),
+      reports,
+      stats: assertRead<AdminStats>(statsResult),
+      auditLog,
     };
   },
 
@@ -652,6 +725,234 @@ export const supabaseRepository: DataRepository = {
     await rpcWrite(supabase, "admin_set_item_approval", {
       p_item_id: itemId,
       p_action: action,
+    });
+  },
+
+  async adminCloseLoan(_adminId, loanId) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_close_loan", { p_loan_id: loanId });
+  },
+
+  async getTaxonomyUsage(): Promise<TaxonomyUsage> {
+    const supabase = await createClient();
+    return assertRead<TaxonomyUsage>(await supabase.rpc("admin_taxonomy_usage"));
+  },
+
+  async saveCategory(_adminId, input) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_save_category", {
+      p_id: input.id ?? null,
+      p_name: input.name,
+      p_icon: input.icon,
+    });
+  },
+
+  async deleteCategory(_adminId, categoryId) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_delete_category", { p_id: categoryId });
+  },
+
+  async saveArea(_adminId, input) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_save_area", { p_id: input.id ?? null, p_name: input.name });
+  },
+
+  async deleteArea(_adminId, areaId) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_delete_area", { p_id: areaId });
+  },
+
+  async getConversations(userId): Promise<ConversationSummary[]> {
+    const supabase = await createClient();
+    const rows = assertRead<ConversationRow[]>(await supabase.rpc("get_my_conversations"));
+    if (rows.length === 0) return [];
+
+    const otherOf = (row: ConversationRow) =>
+      row.owner_id === userId ? row.member_id : row.owner_id;
+
+    const [itemRows, names] = await Promise.all([
+      supabase
+        .from("items")
+        .select(ITEM_SELECT)
+        .in("id", unique(rows.map((row) => row.item_id))),
+      fetchNames(supabase, unique(rows.map(otherOf)), "public_profiles"),
+    ]);
+    const items = await hydrateItems(supabase, assertRead<ItemRow[]>(itemRows as never));
+    const itemsById = new Map(items.map((item) => [item.id, item]));
+
+    return rows.map((row) => ({
+      id: row.id,
+      item_id: row.item_id,
+      item: itemsById.get(row.item_id) ?? null,
+      other_party_id: otherOf(row),
+      other_party_name: names.get(otherOf(row))?.full_name ?? null,
+      viewer_is_owner: row.owner_id === userId,
+      last_message_at: row.last_message_at,
+      last_message_preview: row.last_kind === "image" && !row.last_body ? "תמונה" : row.last_body,
+      unread_count: row.unread_count,
+    }));
+  },
+
+  async getConversation(conversationId, userId): Promise<ConversationDetail | null> {
+    if (!GUID.test(conversationId)) return null;
+    const supabase = await createClient();
+
+    // RLS returns the row only to its two participants.
+    const conversation = assertRead<Pick<
+      ConversationRow,
+      "id" | "item_id" | "owner_id" | "member_id" | "last_message_at"
+    > | null>(
+      await supabase
+        .from("conversations")
+        .select("id, item_id, owner_id, member_id, last_message_at")
+        .eq("id", conversationId)
+        .maybeSingle(),
+    );
+    if (!conversation) return null;
+
+    const otherId =
+      conversation.owner_id === userId ? conversation.member_id : conversation.owner_id;
+
+    const [messageRows, itemRow, names] = await Promise.all([
+      supabase
+        .from("messages")
+        .select("id, conversation_id, sender_id, kind, body, image_path, created_at")
+        .eq("conversation_id", conversationId)
+        .order("created_at", { ascending: false })
+        .limit(300),
+      supabase.from("items").select(ITEM_SELECT).eq("id", conversation.item_id).maybeSingle(),
+      fetchNames(supabase, [otherId], "public_profiles"),
+    ]);
+
+    const rows = assertRead<(Omit<ChatMessage, "image_url"> & { image_path: string | null })[]>(
+      messageRows,
+    ).reverse();
+    const item = assertRead<ItemRow | null>(itemRow as never);
+
+    const [signed, items] = await Promise.all([
+      signPaths(
+        supabase,
+        rows.flatMap((row) => (row.image_path ? [row.image_path] : [])),
+        CHAT_BUCKET,
+      ),
+      hydrateItems(supabase, item ? [item] : []),
+    ]);
+
+    return {
+      id: conversation.id,
+      item_id: conversation.item_id,
+      item: items[0] ?? null,
+      other_party_id: otherId,
+      other_party_name: names.get(otherId)?.full_name ?? null,
+      viewer_is_owner: conversation.owner_id === userId,
+      last_message_at: conversation.last_message_at,
+      messages: rows.map(({ image_path, ...row }) => ({
+        ...row,
+        image_url: image_path ? (signed.get(image_path) ?? null) : null,
+      })),
+    };
+  },
+
+  async startConversation(_userId, itemId, memberId) {
+    const supabase = await createClient();
+    const id = (await rpcWrite(supabase, "start_conversation", {
+      p_item_id: itemId,
+      p_member_id: memberId ?? null,
+    })) as string;
+    return { id };
+  },
+
+  async sendMessage(userId, conversationId, body, image) {
+    const supabase = await createClient();
+
+    let path: string | null = null;
+    if (image) {
+      path = `${conversationId}/${userId}/${crypto.randomUUID()}.${image.ext}`;
+      const { error: uploadError } = await supabase.storage
+        .from(CHAT_BUCKET)
+        .upload(path, image.bytes, { contentType: image.mime, upsert: false });
+      if (uploadError) {
+        console.error("[community-share] chat image upload failed", uploadError.message);
+        throw new AppError("INVALID_IMAGE");
+      }
+    }
+
+    const { error } = await supabase.rpc("send_message", {
+      p_conversation_id: conversationId,
+      p_body: body,
+      p_image_path: path,
+    });
+
+    if (error) {
+      // Do not leave an orphaned file behind when the message was refused.
+      if (path) await supabase.storage.from(CHAT_BUCKET).remove([path]);
+      throwWriteError(error);
+    }
+  },
+
+  async markConversationRead(conversationId) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "mark_conversation_read", { p_conversation_id: conversationId });
+  },
+
+  // Feeds the badges on every page, so a failure degrades to "nothing new"
+  // instead of breaking the page.
+  async getUnreadCounts(): Promise<UnreadCounts> {
+    const empty: UnreadCounts = { notifications: 0, conversations: 0 };
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("get_unread_counts");
+    if (error) {
+      console.error("[community-share] get_unread_counts failed", error.message);
+      return empty;
+    }
+    return one(data as UnreadCounts | UnreadCounts[] | null) ?? empty;
+  },
+
+  async getNotifications(userId, limit): Promise<AppNotification[]> {
+    const supabase = await createClient();
+    return assertRead<AppNotification[]>(
+      await supabase
+        .from("notifications")
+        .select("id, type, title, body, link, read_at, created_at")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(limit),
+    );
+  },
+
+  async markNotificationsRead(_userId, ids) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "mark_notifications_read", { p_ids: ids ?? null });
+  },
+
+  async createReport(_userId, input) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "create_report", {
+      p_target_type: input.targetType,
+      p_target_id: input.targetId,
+      p_reason: input.reason,
+      p_details: input.details,
+    });
+  },
+
+  async getMyReports(userId): Promise<Report[]> {
+    const supabase = await createClient();
+    return assertRead<Report[]>(
+      (await supabase
+        .from("reports")
+        .select(REPORT_SELECT)
+        .eq("reporter_id", userId)
+        .order("created_at", { ascending: false })
+        .limit(20)) as never,
+    );
+  },
+
+  async updateReport(_adminId, reportId, status, note) {
+    const supabase = await createClient();
+    await rpcWrite(supabase, "admin_update_report", {
+      p_report_id: reportId,
+      p_status: status,
+      p_note: note,
     });
   },
 };

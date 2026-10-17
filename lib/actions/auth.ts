@@ -12,6 +12,7 @@ import { DEMO_USERS } from "@/lib/mock/users";
 import { enforceRateLimit, getClientIp } from "@/lib/security/rate-limit";
 import { createClient } from "@/lib/supabase/server";
 import { safeRedirectPath } from "@/lib/utils/url";
+import { domainAcceptsMail } from "@/lib/validation/email-dns";
 import {
   loginSchema,
   newPasswordSchema,
@@ -64,6 +65,10 @@ export async function registerAction(
     await enforceRateLimit("registerPerIp", await getClientIp());
   } catch {
     return { error: RATE_LIMIT_MESSAGE };
+  }
+
+  if (!(await domainAcceptsMail(parsed.data.email))) {
+    return { error: "הדומיין של כתובת האימייל לא קיים או לא מקבל דואר. נא לבדוק את הכתובת" };
   }
 
   const supabase = await createClient();

@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import { AppNav } from "@/components/AppNav";
-import { CancelRequestButton, LoanActions } from "@/components/ItemActions";
+import { CancelRequestButton, LoanActions, OpenChatButton } from "@/components/ItemActions";
 import { ItemThumbnail } from "@/components/ItemCard";
 import { StatusBadge } from "@/components/StatusBadge";
 import { requirePageUser } from "@/lib/auth/session";
@@ -133,15 +133,20 @@ export default async function MyLoansPage({
                   </p>
                 )}
 
-                {request.loan ? (
-                  <LoanActions
-                    loanId={request.loan.id}
-                    role="requester"
-                    status={request.loan.status}
-                  />
-                ) : (
-                  request.status === "pending" && <CancelRequestButton requestId={request.id} />
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {request.loan ? (
+                    <LoanActions
+                      loanId={request.loan.id}
+                      role="requester"
+                      status={request.loan.status}
+                    />
+                  ) : (
+                    request.status === "pending" && <CancelRequestButton requestId={request.id} />
+                  )}
+                  {request.item && (
+                    <OpenChatButton itemId={request.item_id} label="צ'אט עם הבעלים" />
+                  )}
+                </div>
               </li>
             );
           })}

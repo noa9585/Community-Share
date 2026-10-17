@@ -5,10 +5,9 @@ import { useEffect, useState } from "react";
 import { FormMessage, useFormAction } from "@/components/FormHelpers";
 import { MaterialIcon } from "@/components/MaterialIcon";
 import { createItemAction, updateItemAction } from "@/lib/actions/items";
-import { MAX_ITEM_IMAGES, RESIDENCE_AREAS } from "@/lib/validation/schemas";
+import { compressImage } from "@/lib/utils/compress-image";
+import { MAX_ITEM_IMAGES } from "@/lib/validation/schemas";
 
-const MAX_DIMENSION = 1280;
-const TARGET_BYTES = 700 * 1024;
 const RING_LENGTH = 282.7;
 
 const FIELD_CLASS =
@@ -30,48 +29,18 @@ export type ItemFormValues = {
   images: ExistingImage[];
 };
 
-/**
- * Shrinks and re-encodes a photo as JPEG in the browser. This keeps uploads
- * small on mobile data and strips metadata such as the GPS position that phone
- * cameras embed in pictures.
- */
-async function compressImage(file: File): Promise<File | null> {
-  try {
-    const bitmap = await createImageBitmap(file);
-    const scale = Math.min(1, MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
-    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
-
-    const context = canvas.getContext("2d");
-    if (!context) return null;
-    context.fillStyle = "#ffffff";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-    bitmap.close();
-
-    for (const quality of [0.82, 0.7, 0.55, 0.4]) {
-      const blob = await new Promise<Blob | null>((resolve) =>
-        canvas.toBlob(resolve, "image/jpeg", quality),
-      );
-      if (blob && blob.size <= TARGET_BYTES) {
-        return new File([blob], "photo.jpg", { type: "image/jpeg" });
-      }
-    }
-    return null;
-  } catch {
-    return null;
-  }
-}
-
 export function ItemForm({
   categories,
+  areas,
   item,
 }: {
   categories: { id: string; name: string }[];
+  areas: string[];
   item?: ItemFormValues;
 }) {
   const isEdit = Boolean(item);
+  // Keep the item's current area selectable even if it is no longer listed.
+  const areaOptions = item?.area && !areas.includes(item.area) ? [item.area, ...areas] : areas;
   const [state, action, pending] = useFormAction(isEdit ? updateItemAction : createItemAction);
   const [rating, setRating] = useState(item?.conditionRating ?? 8);
   const [newImages, setNewImages] = useState<NewImage[]>([]);
@@ -309,7 +278,7 @@ export function ItemForm({
               <option value="" disabled>
                 בחר אזור
               </option>
-              {RESIDENCE_AREAS.map((area) => (
+              {areaOptions.map((area) => (
                 <option key={area} value={area}>
                   {area}
                 </option>

@@ -5,6 +5,7 @@ import { AppNav } from "@/components/AppNav";
 import { StatusBadge } from "@/components/StatusBadge";
 import { requirePageUser } from "@/lib/auth/session";
 import { isMockMode } from "@/lib/config";
+import { getRepository } from "@/lib/data/index";
 
 export const metadata: Metadata = {
   title: "הפרופיל שלי | שיתוף קהילתי",
@@ -14,6 +15,7 @@ const CARD = "rounded-2xl border border-secondary/10 bg-white p-5 md:p-6";
 
 export default async function ProfilePage() {
   const user = await requirePageUser();
+  const areas = await (await getRepository()).getAreas();
 
   return (
     <AppNav user={user} activePath="/profile" headerTitle="הפרופיל שלי">
@@ -39,7 +41,11 @@ export default async function ProfilePage() {
 
         <section className={CARD}>
           <h2 className="mb-4 font-headline-sm text-headline-sm text-secondary">פרטים אישיים</h2>
-          <ProfileForm fullName={user.full_name} residenceArea={user.residence_area} />
+          <ProfileForm
+            fullName={user.full_name}
+            residenceArea={user.residence_area}
+            areas={areas.map((area) => area.name)}
+          />
         </section>
 
         {!isMockMode() && (

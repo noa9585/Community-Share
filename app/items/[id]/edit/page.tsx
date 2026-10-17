@@ -20,7 +20,11 @@ export default async function EditItemPage({
   const user = await requirePageUser();
   const repo = await getRepository();
 
-  const [item, categories] = await Promise.all([repo.getItemById(id), repo.getCategories()]);
+  const [item, categories, areas] = await Promise.all([
+    repo.getItemById(id),
+    repo.getCategories(),
+    repo.getAreas(),
+  ]);
 
   // Only the owner may open the edit form; the database enforces it again on save.
   if (!item || item.owner_id !== user.id) notFound();
@@ -33,6 +37,7 @@ export default async function EditItemPage({
         </h1>
         <ItemForm
           categories={categories}
+          areas={areas.map((area) => area.name)}
           item={{
             id: item.id,
             name: item.name,

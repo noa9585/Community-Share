@@ -25,6 +25,17 @@ export interface Category {
   icon?: string;
 }
 
+export interface Area {
+  id: string;
+  name: string;
+}
+
+/** How many items use each category, and members/items each area (keyed by id). */
+export type TaxonomyUsage = {
+  categories: Record<string, number>;
+  areas: Record<string, { users: number; items: number }>;
+};
+
 export interface Item {
   id: string;
   owner_id: string;
@@ -89,12 +100,104 @@ export type ItemBooking = {
   requested_quantity: number;
 };
 
+export type MessageKind = "text" | "image" | "system";
+
+export interface ChatMessage {
+  id: string;
+  conversation_id: string;
+  /** Null for automatic system messages. */
+  sender_id: string | null;
+  kind: MessageKind;
+  body: string;
+  image_url: string | null;
+  created_at: string;
+}
+
+export type ConversationSummary = {
+  id: string;
+  item_id: string;
+  item: ItemWithRelations | null;
+  other_party_id: string;
+  other_party_name: string | null;
+  /** True when the viewer owns the item the chat is about. */
+  viewer_is_owner: boolean;
+  last_message_at: string;
+  last_message_preview: string;
+  unread_count: number;
+};
+
+export type ConversationDetail = Omit<
+  ConversationSummary,
+  "last_message_preview" | "unread_count"
+> & {
+  messages: ChatMessage[];
+};
+
+export type UnreadCounts = { notifications: number; conversations: number };
+
+export interface AppNotification {
+  id: string;
+  type: string;
+  title: string;
+  body: string;
+  link: string;
+  read_at: string | null;
+  created_at: string;
+}
+
+export type ReportTargetType = "item" | "user";
+export type ReportReason = "damaged" | "misleading" | "not_returned" | "behavior" | "other";
+export type ReportStatus = "open" | "in_progress" | "resolved" | "dismissed";
+
+export interface Report {
+  id: string;
+  reporter_id: string;
+  target_type: ReportTargetType;
+  item_id: string | null;
+  reported_user_id: string | null;
+  target_label: string;
+  reason: ReportReason;
+  details: string;
+  status: ReportStatus;
+  admin_note: string | null;
+  handled_at: string | null;
+  created_at: string;
+}
+
+export type ReportWithRelations = Report & {
+  reporter_name: string | null;
+  reported_user_name: string | null;
+  reported_user_status: UserStatus | null;
+};
+
+export type AdminStats = {
+  users: { total: number; approved: number; pending: number; blocked: number };
+  items: { total: number; approved: number; pending: number; rejected: number };
+  requests: { total: number; pending: number };
+  loans: { active: number; late: number; awaiting: number; completed: number };
+  openReports: number;
+  messages: number;
+  topItems: { name: string; loans: number }[];
+};
+
+export type AuditLogEntry = {
+  id: string;
+  action: string;
+  target_type: string;
+  created_at: string;
+  admin_name: string | null;
+};
+
 export type AdminDashboard = {
   pendingUsers: User[];
   users: User[];
   pendingItems: ItemWithRelations[];
+  items: ItemWithRelations[];
   activeLoans: LoanWithRelations[];
   lateLoans: LoanWithRelations[];
+  reports: ReportWithRelations[];
+  stats: AdminStats;
+  auditLog: AuditLogEntry[];
 };
 
 export type EmailLogType =

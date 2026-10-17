@@ -1,8 +1,15 @@
 "use client";
 
 import { FormMessage, useFormAction } from "@/components/FormHelpers";
-import { adminItemAction, adminUserAction } from "@/lib/actions/admin";
+import { MaterialIcon } from "@/components/MaterialIcon";
+import {
+  adminItemAction,
+  adminLoanAction,
+  adminReportAction,
+  adminUserAction,
+} from "@/lib/actions/admin";
 import { handleBorrowRequestAction, handleLoanAction } from "@/lib/actions/borrow";
+import { startConversationAction } from "@/lib/actions/chat";
 import { deleteItemAction } from "@/lib/actions/items";
 
 const PRIMARY = "rounded-lg bg-brand-mint px-4 py-2 text-sm font-bold text-brand-deep disabled:opacity-60";
@@ -120,17 +127,135 @@ export function AdminUserActions({
   );
 }
 
-export function AdminItemActions({ itemId }: { itemId: string }) {
+export function AdminItemActions({
+  itemId,
+  status = "pending",
+}: {
+  itemId: string;
+  status?: "pending" | "approved" | "rejected";
+}) {
   const [state, action, pending] = useFormAction(adminItemAction);
 
   return (
     <form action={action} className="flex flex-wrap items-center gap-2">
       <input type="hidden" name="itemId" value={itemId} />
-      <button name="action" value="approve" disabled={pending} className={PRIMARY}>
-        אשר
+      {status !== "approved" && (
+        <button name="action" value="approve" disabled={pending} className={PRIMARY}>
+          {status === "rejected" ? "החזר לקטלוג" : "אשר"}
+        </button>
+      )}
+      {status !== "rejected" && (
+        <button name="action" value="reject" disabled={pending} className={DANGER}>
+          {status === "approved" ? "הסר מהקטלוג" : "דחה"}
+        </button>
+      )}
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+/** Lets an admin close a loan that its owner has left open. */
+export function AdminLoanActions({ loanId }: { loanId: string }) {
+  const [state, action, pending] = useFormAction(adminLoanAction);
+
+  return (
+    <form
+      action={action}
+      onSubmit={(event) => {
+        if (!confirm("לסגור את ההשאלה במקום בעל הפריט? הפעולה תירשם ביומן.")) {
+          event.preventDefault();
+        }
+      }}
+      className="flex flex-wrap items-center gap-2"
+    >
+      <input type="hidden" name="loanId" value={loanId} />
+      <button type="submit" disabled={pending} className={OUTLINE}>
+        סגירת השאלה
       </button>
-      <button name="action" value="reject" disabled={pending} className={DANGER}>
-        דחה
+      <FormMessage state={state} />
+    </form>
+  );
+}
+
+export function AdminReportActions({
+  reportId,
+  status,
+  note,
+}: {
+  reportId: string;
+  status: "open" | "in_progress" | "resolved" | "dismissed";
+  note: string | null;
+}) {
+  const [state, action, pending] = useFormAction(adminReportAction);
+  const closed = status === "resolved" || status === "dismissed";
+
+  return (
+    <form action={action} className="space-y-2">
+      <input type="hidden" name="reportId" value={reportId} />
+      <label className="block text-sm font-bold text-secondary">
+        הערת טיפול (פנימית, לא נשלחת למדווח/ת)
+        <textarea
+          name="note"
+          rows={2}
+          maxLength={1000}
+          defaultValue={note ?? ""}
+          className="mt-1 w-full rounded-lg border-none bg-surface-container-low px-3 py-2 text-sm font-normal text-on-surface focus:ring-2 focus:ring-trust-mint"
+        />
+      </label>
+      <div className="flex flex-wrap items-center gap-2">
+        {status !== "in_progress" && (
+          <button name="status" value="in_progress" disabled={pending} className={OUTLINE}>
+            {closed ? "פתיחה מחדש" : "העבר לטיפול"}
+          </button>
+        )}
+        {status !== "resolved" && (
+          <button name="status" value="resolved" disabled={pending} className={PRIMARY}>
+            סמן כטופל
+          </button>
+        )}
+        {status !== "dismissed" && (
+          <button name="status" value="dismissed" disabled={pending} className={DANGER}>
+            סגור ללא פעולה
+          </button>
+        )}
+        <FormMessage state={state} />
+      </div>
+    </form>
+  );
+}
+
+/**
+ * Opens the chat about an item. A member talks to the item's owner; the owner
+ * passes `memberId` to talk to the member who asked for the item.
+ */
+export function OpenChatButton({
+  itemId,
+  memberId,
+  label = "צ'אט",
+  variant = "outline",
+}: {
+  itemId: string;
+  memberId?: string;
+  label?: string;
+  variant?: "outline" | "block";
+}) {
+  const [state, action, pending] = useFormAction(startConversationAction);
+
+  return (
+    <form action={action} className="flex flex-wrap items-center gap-2">
+      <input type="hidden" name="itemId" value={itemId} />
+      {memberId && <input type="hidden" name="memberId" value={memberId} />}
+      <button
+        type="submit"
+        disabled={pending}
+        className={
+          variant === "block"
+            ? "flex w-full items-center justify-center gap-2 rounded-2xl border-2 border-secondary/30 bg-white px-8 py-3 font-bold text-secondary transition-all hover:bg-secondary/5 active:scale-95 disabled:opacity-60"
+            : `${OUTLINE} flex items-center gap-1.5`
+        }
+      >
+        <MaterialIcon name="chat" size={variant === "block" ? 22 : 18} />
+        {label}
       </button>
       <FormMessage state={state} />
     </form>

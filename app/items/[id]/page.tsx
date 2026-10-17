@@ -4,7 +4,7 @@ import { notFound } from "next/navigation";
 
 import { AppNav } from "@/components/AppNav";
 import { AvailabilityCalendar } from "@/components/AvailabilityCalendar";
-import { AdminItemActions, DeleteItemButton } from "@/components/ItemActions";
+import { AdminItemActions, DeleteItemButton, OpenChatButton } from "@/components/ItemActions";
 import { ItemImagePlaceholder, MaterialIcon } from "@/components/MaterialIcon";
 import { StatusBadge } from "@/components/StatusBadge";
 import { TrustRingLarge, trustScoreFromRating } from "@/components/TrustRing";
@@ -75,7 +75,7 @@ export default async function ItemPage({
               ? "הפריט ממתין לאישור אדמין ואינו מופיע בקטלוג."
               : "הפריט נדחה על ידי אדמין ואינו מופיע בקטלוג. ניתן לערוך ולשלוח שוב."}
           </p>
-          {isAdmin && <AdminItemActions itemId={item.id} />}
+          {isAdmin && <AdminItemActions itemId={item.id} status={item.approval_status} />}
         </div>
       )}
 
@@ -170,6 +170,19 @@ export default async function ItemPage({
             >
               בקשת השאלה
             </Link>
+          )}
+
+          {canBorrow && (
+            <div className="space-y-3">
+              <OpenChatButton itemId={item.id} label="שאלה לבעל/ת הפריט" variant="block" />
+              <Link
+                href={`/report?item=${item.id}`}
+                className="flex items-center justify-center gap-1 text-sm text-on-surface-variant underline hover:text-error"
+              >
+                <MaterialIcon name="flag" size={18} />
+                דיווח על בעיה בפריט
+              </Link>
+            </div>
           )}
 
           {isOwner && (

@@ -1,11 +1,19 @@
-import type { ItemInput, ProfileInput } from "@/lib/validation/schemas";
+import type { ItemInput, ProfileInput, ReportInput } from "@/lib/validation/schemas";
 import type {
   AdminDashboard,
+  AppNotification,
+  Area,
   BorrowRequestWithRelations,
+  ConversationDetail,
+  ConversationSummary,
   EmailLogEntry,
   HomeDashboard,
   ItemBooking,
   ItemWithRelations,
+  Report,
+  ReportStatus,
+  TaxonomyUsage,
+  UnreadCounts,
   User,
 } from "@/types/database";
 
@@ -27,6 +35,7 @@ export type CatalogFilters = {
 export interface DataRepository {
   getUserById(userId: string): Promise<User | null>;
   getCategories(): Promise<HomeDashboard["categories"]>;
+  getAreas(): Promise<Area[]>;
   getHomeDashboard(userId: string): Promise<HomeDashboard>;
   getCatalogItems(filters: CatalogFilters): Promise<ItemWithRelations[]>;
   searchItems(query: string): Promise<{ id: string; name: string }[]>;
@@ -70,5 +79,43 @@ export interface DataRepository {
   updateItemApproval(
     itemId: string,
     action: "approve" | "reject",
+  ): Promise<void>;
+  adminCloseLoan(adminId: string, loanId: string): Promise<void>;
+  getTaxonomyUsage(): Promise<TaxonomyUsage>;
+  saveCategory(
+    adminId: string,
+    input: { id?: string; name: string; icon: string },
+  ): Promise<void>;
+  deleteCategory(adminId: string, categoryId: string): Promise<void>;
+  saveArea(adminId: string, input: { id?: string; name: string }): Promise<void>;
+  deleteArea(adminId: string, areaId: string): Promise<void>;
+
+  // Chat
+  getConversations(userId: string): Promise<ConversationSummary[]>;
+  getConversation(conversationId: string, userId: string): Promise<ConversationDetail | null>;
+  /** `memberId` is only needed when the item's owner opens the chat. */
+  startConversation(userId: string, itemId: string, memberId?: string): Promise<{ id: string }>;
+  sendMessage(
+    userId: string,
+    conversationId: string,
+    body: string,
+    image: UploadImage | null,
+  ): Promise<void>;
+  markConversationRead(conversationId: string, userId: string): Promise<void>;
+
+  // Notifications
+  getUnreadCounts(userId: string): Promise<UnreadCounts>;
+  getNotifications(userId: string, limit: number): Promise<AppNotification[]>;
+  /** Marks the given notifications as read, or all of them when `ids` is omitted. */
+  markNotificationsRead(userId: string, ids?: string[]): Promise<void>;
+
+  // Reports
+  createReport(userId: string, input: ReportInput): Promise<void>;
+  getMyReports(userId: string): Promise<Report[]>;
+  updateReport(
+    adminId: string,
+    reportId: string,
+    status: Exclude<ReportStatus, "open">,
+    note: string,
   ): Promise<void>;
 }

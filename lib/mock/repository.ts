@@ -2,8 +2,12 @@ import type { DataRepository } from "@/lib/data/repository";
 import { AppError } from "@/lib/errors";
 import type {
   AdminDashboard,
+  AdminStats,
+  AppNotification,
   BorrowRequest,
   BorrowRequestWithRelations,
+  ConversationDetail,
+  ConversationSummary,
   HomeDashboard,
   Item,
   ItemBooking,
@@ -11,22 +15,30 @@ import type {
   ItemWithRelations,
   Loan,
   LoanWithRelations,
+  TaxonomyUsage,
+  UnreadCounts,
 } from "@/types/database";
 
 import {
+  type MockConversation,
+  adminCloseLoan,
   approveBorrowRequest,
   cancelBorrowRequest,
   checkItemAvailability,
   confirmLoanReturn,
   createId,
   deleteItem,
+  ensureConversation,
   getMockState,
   insertBorrowRequest,
   insertItem,
+  logAdminAction,
   markDepositReceived,
   markLateLoans,
   markLoanReturned,
+  notifyAdmins,
   openBookings,
+  pushNotification,
   rejectBorrowRequest,
   updateItemApproval,
   updateUserStatus,
@@ -92,6 +104,86 @@ function byNewest(a: { created_at: string }, b: { created_at: string }): number 
   return b.created_at.localeCompare(a.created_at);
 }
 
+function participantConversation(conversationId: string, userId: string): MockConversation | null {
+  const conversation = getMockState().conversations.find((c) => c.id === conversationId);
+  if (!conversation) return null;
+  return conversation.owner_id === userId || conversation.member_id === userId
+    ? conversation
+    : null;
+}
+
+function lastReadAt(conversation: MockConversation, userId: string): string {
+  return conversation.owner_id === userId
+    ? conversation.owner_last_read_at
+    : conversation.member_last_read_at;
+}
+
+function setLastRead(conversation: MockConversation, userId: string, at: string): void {
+  if (conversation.owner_id === userId) conversation.owner_last_read_at = at;
+  else conversation.member_last_read_at = at;
+}
+
+function conversationParties(conversation: MockConversation, userId: string) {
+  const state = getMockState();
+  const viewerIsOwner = conversation.owner_id === userId;
+  const otherId = viewerIsOwner ? conversation.member_id : conversation.owner_id;
+  const item = state.items.find((i) => i.id === conversation.item_id);
+  return {
+    id: conversation.id,
+    item_id: conversation.item_id,
+    item: item ? enrichItem(item) : null,
+    other_party_id: otherId,
+    other_party_name: state.users.find((u) => u.id === otherId)?.full_name ?? null,
+    viewer_is_owner: viewerIsOwner,
+    last_message_at: conversation.last_message_at,
+  };
+}
+
+function mockStats(): AdminStats {
+  const { users, items, borrowRequests, loans, reports, messages } = getMockState();
+  const count = <T,>(rows: T[], test: (row: T) => boolean) => rows.filter(test).length;
+
+  const loansPerItem = new Map<string, number>();
+  for (const loan of loans) {
+    const request = borrowRequests.find((br) => br.id === loan.borrow_request_id);
+    if (request) loansPerItem.set(request.item_id, (loansPerItem.get(request.item_id) ?? 0) + 1);
+  }
+
+  return {
+    users: {
+      total: users.length,
+      approved: count(users, (u) => u.status === "approved"),
+      pending: count(users, (u) => u.status === "pending"),
+      blocked: count(users, (u) => u.status === "blocked"),
+    },
+    items: {
+      total: items.length,
+      approved: count(items, (i) => i.approval_status === "approved"),
+      pending: count(items, (i) => i.approval_status === "pending"),
+      rejected: count(items, (i) => i.approval_status === "rejected"),
+    },
+    requests: {
+      total: borrowRequests.length,
+      pending: count(borrowRequests, (br) => br.status === "pending"),
+    },
+    loans: {
+      active: count(loans, (l) => l.status === "active"),
+      late: count(loans, (l) => l.status === "late"),
+      awaiting: count(loans, (l) => l.status === "returned_pending_confirmation"),
+      completed: count(loans, (l) => l.status === "completed"),
+    },
+    openReports: count(reports, (r) => r.status === "open" || r.status === "in_progress"),
+    messages: count(messages, (m) => m.kind !== "system"),
+    topItems: [...loansPerItem.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([itemId, total]) => ({
+        name: items.find((i) => i.id === itemId)?.name ?? "פריט",
+        loans: total,
+      })),
+  };
+}
+
 export const mockRepository: DataRepository = {
   async getUserById(userId) {
     return getMockState().users.find((u) => u.id === userId) ?? null;
@@ -99,6 +191,10 @@ export const mockRepository: DataRepository = {
 
   async getCategories() {
     return getMockState().categories;
+  },
+
+  async getAreas() {
+    return getMockState().areas;
   },
 
   async getHomeDashboard(userId): Promise<HomeDashboard> {
@@ -197,14 +293,36 @@ export const mockRepository: DataRepository = {
   async getAdminDashboard(): Promise<AdminDashboard> {
     markLateLoans();
     const state = getMockState();
+    const userById = (id: string | null) => state.users.find((u) => u.id === id);
     return {
       pendingUsers: state.users.filter((u) => u.status === "pending"),
       users: state.users,
       pendingItems: state.items.filter((i) => i.approval_status === "pending").map(enrichItem),
+      items: [...state.items].sort(byNewest).map(enrichItem),
       activeLoans: state.loans
         .filter((l) => l.status === "active" || l.status === "returned_pending_confirmation")
         .map(loanEntry),
       lateLoans: state.loans.filter((l) => l.status === "late").map(loanEntry),
+      reports: [...state.reports].sort(byNewest).map((report) => {
+        const reported = userById(report.reported_user_id);
+        return {
+          ...report,
+          reporter_name: userById(report.reporter_id)?.full_name ?? null,
+          reported_user_name: reported?.full_name ?? null,
+          reported_user_status: reported?.status ?? null,
+        };
+      }),
+      stats: mockStats(),
+      auditLog: [...state.auditLog]
+        .sort(byNewest)
+        .slice(0, 30)
+        .map((entry) => ({
+          id: entry.id,
+          action: entry.action,
+          target_type: entry.target_type,
+          created_at: entry.created_at,
+          admin_name: userById(entry.admin_id)?.full_name ?? null,
+        })),
     };
   },
 
@@ -333,9 +451,333 @@ export const mockRepository: DataRepository = {
       unblock: "approved",
     } as const;
     updateUserStatus(userId, statusMap[action]);
+    logAdminAction(adminId, `user_${action}`, "user", userId);
+    if (action === "approve") {
+      pushNotification(
+        userId,
+        "user_approved",
+        "ברוך הבא לקהילה",
+        "החשבון שלך אושר. אפשר לחפש ציוד בקטלוג ולשתף פריטים משלך.",
+        "/catalog",
+        userId,
+      );
+    }
   },
 
   async updateItemApproval(itemId, action) {
     updateItemApproval(itemId, action === "approve" ? "approved" : "rejected");
+  },
+
+  async adminCloseLoan(adminId, loanId) {
+    adminCloseLoan(loanId, adminId);
+  },
+
+  async getTaxonomyUsage(): Promise<TaxonomyUsage> {
+    const { categories, areas, items, users } = getMockState();
+    return {
+      categories: Object.fromEntries(
+        categories.map((c) => [c.id, items.filter((i) => i.category_id === c.id).length]),
+      ),
+      areas: Object.fromEntries(
+        areas.map((a) => [
+          a.id,
+          {
+            users: users.filter((u) => u.residence_area === a.name).length,
+            items: items.filter((i) => i.area === a.name).length,
+          },
+        ]),
+      ),
+    };
+  },
+
+  async saveCategory(adminId, input) {
+    const { categories } = getMockState();
+    if (categories.some((c) => c.name === input.name && c.id !== input.id)) {
+      throw new AppError("DUPLICATE_NAME");
+    }
+    if (input.id) {
+      const category = categories.find((c) => c.id === input.id);
+      if (!category) throw new AppError("NOT_FOUND");
+      category.name = input.name;
+      category.icon = input.icon;
+    } else {
+      categories.push({ id: createId(), name: input.name, icon: input.icon });
+    }
+    logAdminAction(adminId, input.id ? "category_update" : "category_create", "category", input.id ?? "");
+  },
+
+  async deleteCategory(adminId, categoryId) {
+    const state = getMockState();
+    if (state.items.some((i) => i.category_id === categoryId)) throw new AppError("CATEGORY_IN_USE");
+    if (state.categories.length <= 1) throw new AppError("LAST_CATEGORY");
+    state.categories = state.categories.filter((c) => c.id !== categoryId);
+    logAdminAction(adminId, "category_delete", "category", categoryId);
+  },
+
+  async saveArea(adminId, input) {
+    const state = getMockState();
+    if (state.areas.some((a) => a.name === input.name && a.id !== input.id)) {
+      throw new AppError("DUPLICATE_NAME");
+    }
+    if (input.id) {
+      const area = state.areas.find((a) => a.id === input.id);
+      if (!area) throw new AppError("NOT_FOUND");
+      // What ON UPDATE CASCADE does in the database.
+      for (const user of state.users) if (user.residence_area === area.name) user.residence_area = input.name;
+      for (const item of state.items) if (item.area === area.name) item.area = input.name;
+      area.name = input.name;
+    } else {
+      state.areas.push({ id: createId(), name: input.name });
+    }
+    logAdminAction(adminId, input.id ? "area_update" : "area_create", "area", input.id ?? "");
+  },
+
+  async deleteArea(adminId, areaId) {
+    const state = getMockState();
+    const area = state.areas.find((a) => a.id === areaId);
+    if (!area) throw new AppError("NOT_FOUND");
+    if (
+      state.users.some((u) => u.residence_area === area.name) ||
+      state.items.some((i) => i.area === area.name)
+    ) {
+      throw new AppError("AREA_IN_USE");
+    }
+    if (state.areas.length <= 1) throw new AppError("LAST_AREA");
+    state.areas = state.areas.filter((a) => a.id !== areaId);
+    logAdminAction(adminId, "area_delete", "area", areaId);
+  },
+
+  async getConversations(userId): Promise<ConversationSummary[]> {
+    const state = getMockState();
+    return state.conversations
+      .filter((c) => c.owner_id === userId || c.member_id === userId)
+      .flatMap((conversation) => {
+        const messages = state.messages.filter((m) => m.conversation_id === conversation.id);
+        const last = messages.at(-1);
+        if (!last) return [];
+        const lastRead = lastReadAt(conversation, userId);
+        return [
+          {
+            ...conversationParties(conversation, userId),
+            last_message_preview: last.kind === "image" && !last.body ? "תמונה" : last.body,
+            unread_count: messages.filter(
+              (m) => m.sender_id !== userId && m.created_at > lastRead,
+            ).length,
+          },
+        ];
+      })
+      .sort((a, b) => b.last_message_at.localeCompare(a.last_message_at));
+  },
+
+  async getConversation(conversationId, userId): Promise<ConversationDetail | null> {
+    const state = getMockState();
+    const conversation = participantConversation(conversationId, userId);
+    if (!conversation) return null;
+    return {
+      ...conversationParties(conversation, userId),
+      messages: state.messages.filter((m) => m.conversation_id === conversationId),
+    };
+  },
+
+  async startConversation(userId, itemId, memberId) {
+    const state = getMockState();
+    const item = state.items.find((i) => i.id === itemId);
+    if (!item) throw new AppError("NOT_FOUND");
+
+    const isOwner = item.owner_id === userId;
+    const member = isOwner ? memberId : userId;
+    if (!member || member === item.owner_id) throw new AppError("INVALID_INPUT");
+
+    const hasRequest = state.borrowRequests.some(
+      (br) => br.item_id === itemId && br.requester_id === member,
+    );
+    const exists = state.conversations.some(
+      (c) => c.item_id === itemId && c.member_id === member,
+    );
+    if (!exists && !hasRequest) {
+      if (isOwner) throw new AppError("FORBIDDEN");
+      if (item.approval_status !== "approved") throw new AppError("NOT_FOUND");
+    }
+
+    const conversation = ensureConversation(itemId, member);
+    if (!conversation) throw new AppError("INVALID_INPUT");
+    return { id: conversation.id };
+  },
+
+  async sendMessage(userId, conversationId, body, image) {
+    const state = getMockState();
+    const conversation = participantConversation(conversationId, userId);
+    if (!conversation) throw new AppError("FORBIDDEN");
+    if (!body && !image) throw new AppError("INVALID_INPUT");
+
+    const now = new Date().toISOString();
+    state.messages.push({
+      id: createId(),
+      conversation_id: conversationId,
+      sender_id: userId,
+      kind: image ? "image" : "text",
+      body,
+      // Demo mode has no file storage, so uploads become placeholder pictures.
+      image_url: image ? placeholderImage() : null,
+      created_at: now,
+    });
+    conversation.last_message_at = now;
+    setLastRead(conversation, userId, now);
+
+    const otherId =
+      conversation.owner_id === userId ? conversation.member_id : conversation.owner_id;
+    const preview = body ? body.slice(0, 140) : "תמונה";
+    const pending = state.notifications.find(
+      (n) =>
+        n.user_id === otherId &&
+        n.type === "new_message" &&
+        n.related_id === conversationId &&
+        !n.read_at,
+    );
+    if (pending) {
+      pending.body = preview;
+      pending.created_at = now;
+    } else {
+      const sender = state.users.find((u) => u.id === userId);
+      pushNotification(
+        otherId,
+        "new_message",
+        `הודעה חדשה מ${sender?.full_name ?? "חבר/ת קהילה"}`,
+        preview,
+        `/messages/${conversationId}`,
+        conversationId,
+      );
+    }
+  },
+
+  async markConversationRead(conversationId, userId) {
+    const conversation = participantConversation(conversationId, userId);
+    if (!conversation) return;
+    const now = new Date().toISOString();
+    setLastRead(conversation, userId, now);
+    for (const notification of getMockState().notifications) {
+      if (
+        notification.user_id === userId &&
+        notification.type === "new_message" &&
+        notification.related_id === conversationId
+      ) {
+        notification.read_at ??= now;
+      }
+    }
+  },
+
+  async getUnreadCounts(userId): Promise<UnreadCounts> {
+    const state = getMockState();
+    return {
+      notifications: state.notifications.filter((n) => n.user_id === userId && !n.read_at).length,
+      conversations: state.conversations.filter(
+        (c) =>
+          (c.owner_id === userId || c.member_id === userId) &&
+          state.messages.some(
+            (m) =>
+              m.conversation_id === c.id &&
+              m.sender_id !== userId &&
+              m.created_at > lastReadAt(c, userId),
+          ),
+      ).length,
+    };
+  },
+
+  async getNotifications(userId, limit): Promise<AppNotification[]> {
+    return getMockState()
+      .notifications.filter((n) => n.user_id === userId)
+      .sort(byNewest)
+      .slice(0, limit)
+      .map((notification) => ({
+        id: notification.id,
+        type: notification.type,
+        title: notification.title,
+        body: notification.body,
+        link: notification.link,
+        read_at: notification.read_at,
+        created_at: notification.created_at,
+      }));
+  },
+
+  async markNotificationsRead(userId, ids) {
+    const now = new Date().toISOString();
+    for (const notification of getMockState().notifications) {
+      if (notification.user_id === userId && (!ids || ids.includes(notification.id))) {
+        notification.read_at ??= now;
+      }
+    }
+  },
+
+  async createReport(userId, input) {
+    const state = getMockState();
+    const item =
+      input.targetType === "item" ? state.items.find((i) => i.id === input.targetId) : undefined;
+    const reported = state.users.find(
+      (u) => u.id === (item ? item.owner_id : input.targetId),
+    );
+    if (!reported || (input.targetType === "item" && !item)) throw new AppError("NOT_FOUND");
+    if (reported.id === userId) throw new AppError("REPORT_SELF");
+
+    const open = state.reports.filter(
+      (r) => r.reporter_id === userId && (r.status === "open" || r.status === "in_progress"),
+    );
+    if (open.length >= 10) throw new AppError("TOO_MANY_REPORTS");
+
+    const label = item ? item.name : reported.full_name;
+    const id = createId();
+    state.reports.push({
+      id,
+      reporter_id: userId,
+      target_type: input.targetType,
+      item_id: item?.id ?? null,
+      reported_user_id: reported.id,
+      target_label: label,
+      reason: input.reason,
+      details: input.details,
+      status: "open",
+      admin_note: null,
+      handled_at: null,
+      created_at: new Date().toISOString(),
+    });
+    notifyAdmins(
+      "report_created",
+      "דיווח חדש",
+      `${item ? "על הפריט" : "על המשתמש/ת"} "${label}"`,
+      "/admin?tab=reports",
+      id,
+    );
+  },
+
+  async getMyReports(userId) {
+    return getMockState()
+      .reports.filter((r) => r.reporter_id === userId)
+      .sort(byNewest)
+      .slice(0, 20);
+  },
+
+  async updateReport(adminId, reportId, status, note) {
+    const report = getMockState().reports.find((r) => r.id === reportId);
+    if (!report) throw new AppError("NOT_FOUND");
+    const changed = report.status !== status;
+    report.status = status;
+    report.admin_note = note || report.admin_note;
+    report.handled_at = new Date().toISOString();
+    logAdminAction(adminId, `report_${status}`, "report", reportId);
+
+    if (changed) {
+      const titles = {
+        in_progress: "הדיווח שלך בטיפול",
+        resolved: "הדיווח שלך טופל",
+        dismissed: "הדיווח שלך נסגר",
+      };
+      pushNotification(
+        report.reporter_id,
+        "report_updated",
+        titles[status],
+        `דיווח על "${report.target_label}"`,
+        "/report",
+        reportId,
+      );
+    }
   },
 };

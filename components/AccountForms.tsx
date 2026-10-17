@@ -7,7 +7,6 @@ import {
   updatePasswordAction,
   updateProfileAction,
 } from "@/lib/actions/auth";
-import { RESIDENCE_AREAS } from "@/lib/validation/schemas";
 
 export function ForgotPasswordForm() {
   const [state, action, pending] = useFormAction(resetPasswordAction);
@@ -88,11 +87,15 @@ export function NewPasswordForm() {
 export function ProfileForm({
   fullName,
   residenceArea,
+  areas,
 }: {
   fullName: string;
   residenceArea: string;
+  areas: string[];
 }) {
   const [state, action, pending] = useFormAction(updateProfileAction);
+  // Keep the member's current area selectable even if it is no longer listed.
+  const areaOptions = areas.includes(residenceArea) ? areas : [residenceArea, ...areas];
 
   return (
     <form action={action} className="space-y-4">
@@ -122,7 +125,7 @@ export function ProfileForm({
           defaultValue={residenceArea}
           className={AUTH_INPUT}
         >
-          {RESIDENCE_AREAS.map((area) => (
+          {areaOptions.map((area) => (
             <option key={area} value={area}>
               {area}
             </option>

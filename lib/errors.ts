@@ -31,6 +31,13 @@ const MESSAGES: Record<string, string> = {
   CANNOT_MODIFY_SELF: "לא ניתן לשנות את הסטטוס של עצמך",
   CANNOT_MODIFY_ADMIN: "לא ניתן לשנות סטטוס של אדמין",
   RATE_LIMITED: "יותר מדי ניסיונות. נסה/י שוב בעוד מספר דקות",
+  REPORT_SELF: "לא ניתן לדווח על עצמך או על פריט שלך",
+  TOO_MANY_REPORTS: "יש לך יותר מדי דיווחים פתוחים. נא להמתין לטיפול בהם",
+  DUPLICATE_NAME: "כבר קיים פריט ברשימה בשם הזה",
+  AREA_IN_USE: "לא ניתן למחוק אזור שמשתמשים או פריטים משויכים אליו. אפשר לשנות את שמו",
+  CATEGORY_IN_USE: "לא ניתן למחוק קטגוריה שיש בה פריטים. אפשר לשנות את שמה",
+  LAST_AREA: "חייב להישאר לפחות אזור אחד",
+  LAST_CATEGORY: "חייבת להישאר לפחות קטגוריה אחת",
 };
 
 export function messageForError(error: unknown, fallback: string): string {

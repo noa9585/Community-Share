@@ -27,13 +27,20 @@ function originOf(value: string | undefined): string {
 /**
  * Strict Content-Security-Policy. Scripts run only with this request's nonce
  * (no 'unsafe-inline'), so injected markup cannot execute. Images may come only
- * from our own storage; nothing may frame the site or post forms elsewhere.
+ * from our own storage, the browser may connect only to this site and to our
+ * own Realtime endpoint, and nothing may frame the site or post forms elsewhere.
  */
 function buildCsp(nonce: string): string {
   const isDev = process.env.NODE_ENV === "development";
+  const supabaseOrigin = isMockMode() ? "" : originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
   const imageHosts = isMockMode()
     ? "https://picsum.photos https://fastly.picsum.photos"
-    : originOf(process.env.NEXT_PUBLIC_SUPABASE_URL);
+    : supabaseOrigin;
+  // The only cross-origin connection the browser may open: the Realtime
+  // websocket of our own Supabase project (see RealtimeRefresher).
+  const realtimeHosts = supabaseOrigin
+    ? ` ${supabaseOrigin} ${supabaseOrigin.replace(/^http/, "ws")}`
+    : "";
 
   return [
     "default-src 'self'",
@@ -42,7 +49,7 @@ function buildCsp(nonce: string): string {
     "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
     `img-src 'self' blob: data: ${imageHosts}`.trim(),
     "font-src 'self' https://fonts.gstatic.com",
-    "connect-src 'self'",
+    `connect-src 'self'${realtimeHosts}`,
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",

@@ -1,14 +1,18 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
 import { AUTH_BUTTON, AUTH_INPUT, AUTH_LABEL } from "@/components/AuthCard";
 import { FormMessage, useFormAction } from "@/components/FormHelpers";
 import { registerAction } from "@/lib/actions/auth";
-import { RESIDENCE_AREAS } from "@/lib/validation/schemas";
+import { suggestEmailFix } from "@/lib/validation/email-domain";
 
-export function RegisterFormInner({ mockMode }: { mockMode: boolean }) {
+export function RegisterFormInner({ mockMode, areas }: { mockMode: boolean; areas: string[] }) {
   const [state, action, pending] = useFormAction(registerAction);
+  // Controlled so the address survives a failed submit and can be auto-fixed.
+  const [email, setEmail] = useState("");
+  const [suggestion, setSuggestion] = useState<string | null>(null);
 
   if (mockMode) {
     return (
@@ -58,8 +62,36 @@ export function RegisterFormInner({ mockMode }: { mockMode: boolean }) {
             maxLength={254}
             autoComplete="email"
             dir="ltr"
+            value={email}
+            onChange={(event) => {
+              setEmail(event.target.value);
+              setSuggestion(null);
+            }}
+            onBlur={() => setSuggestion(suggestEmailFix(email.trim()))}
+            aria-describedby={suggestion ? "register-email-hint" : undefined}
             className={AUTH_INPUT}
           />
+          {suggestion && (
+            <p
+              id="register-email-hint"
+              role="alert"
+              className="mt-1 flex flex-wrap items-center gap-2 text-sm text-red-700"
+            >
+              <span>
+                נראה שיש טעות בכתובת. האם התכוונת ל-<span dir="ltr">{suggestion}</span>?
+              </span>
+              <button
+                type="button"
+                onClick={() => {
+                  setEmail(suggestion);
+                  setSuggestion(null);
+                }}
+                className="rounded-md border border-secondary/40 px-2 py-0.5 font-medium text-secondary hover:bg-secondary/5"
+              >
+                כן, לתקן
+              </button>
+            </p>
+          )}
         </div>
         <div>
           <label htmlFor="register-password" className={AUTH_LABEL}>
@@ -95,7 +127,7 @@ export function RegisterFormInner({ mockMode }: { mockMode: boolean }) {
             <option value="" disabled>
               בחר/י אזור
             </option>
-            {RESIDENCE_AREAS.map((area) => (
+            {areas.map((area) => (
               <option key={area} value={area}>
                 {area}
               </option>

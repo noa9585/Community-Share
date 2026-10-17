@@ -12,7 +12,7 @@ export const metadata: Metadata = {
 export default async function NewItemPage() {
   const user = await requirePageUser();
   const repo = await getRepository();
-  const categories = await repo.getCategories();
+  const [categories, areas] = await Promise.all([repo.getCategories(), repo.getAreas()]);
 
   return (
     <AppNav user={user} activePath="/my-items" headerTitle="הוספת פריט">
@@ -25,7 +25,7 @@ export default async function NewItemPage() {
             הפריט יופיע בקטלוג לאחר אישור אדמין הקהילה.
           </p>
         </div>
-        <ItemForm categories={categories} />
+        <ItemForm categories={categories} areas={areas.map((area) => area.name)} />
       </div>
     </AppNav>
   );

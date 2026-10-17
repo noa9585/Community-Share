@@ -32,6 +32,34 @@ export function StatusBadge({ status }: { status: string }) {
   );
 }
 
+const REPORT_STATUS: Record<string, { label: string; className: string }> = {
+  open: { label: "פתוח", className: "bg-error-container text-on-error-container border-error/10" },
+  in_progress: {
+    label: "בטיפול",
+    className: "bg-tertiary-container text-on-tertiary-container border-tertiary/10",
+  },
+  resolved: {
+    label: "טופל",
+    className: "bg-primary-container text-on-primary-container border-primary/10",
+  },
+  dismissed: {
+    label: "נסגר ללא פעולה",
+    className: "bg-surface-variant text-on-surface-variant border-outline-variant/30",
+  },
+};
+
+/** Reports have their own wording, so "open" is not confused with a loan state. */
+export function ReportStatusBadge({ status }: { status: string }) {
+  const entry = REPORT_STATUS[status];
+  return (
+    <span
+      className={`inline-flex rounded-full border px-3 py-1 text-xs font-bold ${entry?.className ?? "bg-surface-container text-on-surface-variant border-outline-variant/30"}`}
+    >
+      {entry?.label ?? status}
+    </span>
+  );
+}
+
 export function AvailabilityBadge({
   available,
   total,

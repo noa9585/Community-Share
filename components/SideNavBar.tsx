@@ -1,6 +1,7 @@
 import Link from "next/link";
 
 import { MaterialIcon } from "@/components/MaterialIcon";
+import { CountBadge } from "@/components/TopAppBar";
 import { logoutAction } from "@/lib/actions/auth";
 import type { User } from "@/types/database";
 
@@ -17,6 +18,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/catalog", label: "קטלוג", shortLabel: "קטלוג", icon: "category" },
   { href: "/my-loans", label: "ההשאלות שלי", shortLabel: "השאלות", icon: "shopping_basket" },
   { href: "/my-items", label: "הפריטים שלי", shortLabel: "פריטים", icon: "inventory_2" },
+  { href: "/messages", label: "הודעות", shortLabel: "הודעות", icon: "chat" },
   {
     href: "/admin",
     label: "פאנל ניהול",
@@ -39,9 +41,11 @@ function visibleItems(user: User | null): NavItem[] {
 export function SideNavBar({
   user,
   activePath,
+  unreadConversations = 0,
 }: {
   user: User | null;
   activePath: string;
+  unreadConversations?: number;
 }) {
   return (
     <aside className="fixed right-0 top-0 z-50 hidden h-screen w-sidebar-width flex-col border-l border-outline-variant/15 bg-secondary text-on-secondary md:flex">
@@ -71,6 +75,9 @@ export function SideNavBar({
             >
               <MaterialIcon name={item.icon} />
               <span className="font-label-md text-label-md">{item.label}</span>
+              {item.href === "/messages" && (
+                <CountBadge count={unreadConversations} className="mr-auto" />
+              )}
             </Link>
           );
         })}
@@ -114,9 +121,11 @@ export function SideNavBar({
 export function MobileNavBar({
   user,
   activePath,
+  unreadConversations = 0,
 }: {
   user: User | null;
   activePath: string;
+  unreadConversations?: number;
 }) {
   return (
     <nav
@@ -130,11 +139,17 @@ export function MobileNavBar({
             key={item.href}
             href={item.href}
             aria-current={active ? "page" : undefined}
-            className={`flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-medium ${
+            className={`relative flex min-w-0 flex-1 flex-col items-center gap-0.5 px-1 py-2 text-[11px] font-medium ${
               active ? "text-secondary" : "text-on-surface-variant"
             }`}
           >
             <MaterialIcon name={item.icon} filled={active} size={24} />
+            {item.href === "/messages" && (
+              <CountBadge
+                count={unreadConversations}
+                className="absolute right-1/2 top-1 translate-x-5"
+              />
+            )}
             <span className="truncate">{item.shortLabel}</span>
           </Link>
         );

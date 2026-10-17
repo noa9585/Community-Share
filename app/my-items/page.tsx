@@ -6,6 +6,7 @@ import {
   DeleteItemButton,
   IncomingRequestActions,
   LoanActions,
+  OpenChatButton,
 } from "@/components/ItemActions";
 import { ItemThumbnail } from "@/components/ItemCard";
 import { StatusBadge } from "@/components/StatusBadge";
@@ -97,7 +98,10 @@ export default async function MyItemsPage({
           {incomingRequests.map((request) => (
             <div key={request.id} className={`${CARD} flex flex-wrap items-center justify-between gap-4`}>
               <RequestSummary request={request} />
-              <IncomingRequestActions requestId={request.id} />
+              <div className="flex flex-wrap items-center gap-2">
+                <IncomingRequestActions requestId={request.id} />
+                <OpenChatButton itemId={request.item_id} memberId={request.requester_id} />
+              </div>
             </div>
           ))}
         </section>
@@ -119,15 +123,24 @@ export default async function MyItemsPage({
                   )}
                 </div>
               </div>
-              {request.loan && (
-                <LoanActions
-                  loanId={request.loan.id}
-                  role="owner"
-                  status={request.loan.status}
-                  depositAmount={request.item?.deposit_amount ?? 0}
-                  depositReceived={request.loan.deposit_received}
-                />
-              )}
+              <div className="flex flex-wrap items-center gap-2">
+                {request.loan && (
+                  <LoanActions
+                    loanId={request.loan.id}
+                    role="owner"
+                    status={request.loan.status}
+                    depositAmount={request.item?.deposit_amount ?? 0}
+                    depositReceived={request.loan.deposit_received}
+                  />
+                )}
+                <OpenChatButton itemId={request.item_id} memberId={request.requester_id} />
+                <Link
+                  href={`/report?user=${request.requester_id}`}
+                  className="text-sm text-on-surface-variant underline hover:text-error"
+                >
+                  דיווח
+                </Link>
+              </div>
             </div>
           ))}
         </section>

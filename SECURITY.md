@@ -11,7 +11,7 @@ security checklist, followed by the additional hardening that goes beyond it.
 | 2 | Input validation | Every Server Action and every query-string parameter is parsed with a Zod schema before use. The database repeats the important limits as `CHECK` constraints. | `lib/validation/schemas.ts`, `001_schema.sql` |
 | 3 | SQL injection | No SQL is ever built from strings. Queries go through the Supabase query builder and parameterised functions; search terms are escaped for `LIKE`. | `lib/supabase/repository.ts` |
 | 4 | Authentication on protected routes | Three layers: the proxy guards every route, each page re-checks the user next to its data, and each action calls `requireApprovedUser()` / `requireAdminUser()`. | `proxy.ts`, `lib/auth/session.ts` |
-| 5 | Sensitive data in the browser | The service-role key is only read inside a `server-only` module. The browser never talks to Supabase directly – there is no browser client at all. | `lib/supabase/admin.ts` |
+| 5 | Sensitive data in the browser | The service-role key is only read inside a `server-only` module. The browser never reads or writes data directly: its only direct connection to Supabase is a Realtime subscription (see "Realtime" below). | `lib/supabase/admin.ts`, `components/RealtimeRefresher.tsx` |
 | 6 | Rate limiting | Login, registration, password reset, search and all mutations are limited. Counters live in Postgres (serverless instances share no memory) and keys are hashed. | `lib/security/rate-limit.ts` |
 | 7 | CORS | No cross-origin API is exposed and no `Access-Control-Allow-Origin` header is sent. Server Actions accept same-origin requests only (enforced by Next.js). | – |
 | 8 | Row Level Security | RLS is enabled on every table. Clients have `SELECT` only; anonymous visitors have no access at all. | `002_rls_policies.sql` |
@@ -35,7 +35,35 @@ security checklist, followed by the additional hardening that goes beyond it.
 - **Privacy**: other members' e-mail addresses are never readable. A view exposes
   name and area only; the two parties of a request get each other's address through
   a dedicated function. The occupancy calendar returns dates and quantities, not who.
-- **Audit**: admin approvals and blocks are written to `admin_audit_log`.
+- **Audit**: admin approvals, blocks, forced loan closures and report decisions are
+  written to `admin_audit_log`.
+- **Private chats**: a conversation and its messages are readable only by its two
+  participants. Admins are deliberately excluded; a problem in a chat reaches them
+  through a report. Who may open a chat with whom is decided in `start_conversation`
+  (an owner can only reach a member who already requested that item).
+- **Notifications and system messages cannot be forged**: they are written by
+  triggers in the same transaction as the event, and clients have no write access
+  to `notifications` or `messages`.
+- **Reports**: readable by the reporter and by admins only. The reported member
+  never sees the report or who filed it.
+
+## Realtime
+
+Live updates (chat, notifications, loan status) use Supabase Realtime, which is the
+one place the browser connects to Supabase directly.
+
+- The browser only **listens**. An event is used purely as a signal to ask the
+  server to render the page again; the data shown is fetched by the server exactly
+  as on a normal page load. All writes still go through Server Actions.
+- Realtime applies the same `SELECT` policies as every other read, so a subscriber
+  receives an event only for a row they could already read.
+- To subscribe, the page receives the signed-in user's own short-lived access token
+  (about one hour), refreshed through a Server Action. It is held in memory only.
+  This is the standard Supabase model: possessing the token grants nothing beyond
+  what the database policies and functions allow that user anyway, which is why the
+  rules live in the database and not in the app.
+- The Content-Security-Policy `connect-src` allows exactly two origins: this site
+  and the project's own Supabase endpoint (`https` and `wss`).
 
 ## Files
 
@@ -45,6 +73,9 @@ security checklist, followed by the additional hardening that goes beyond it.
   then the server identifies the type from the file's **magic bytes** – the browser's
   MIME type and file name are ignored – and enforces count and size limits.
 - Storage policies allow writing only under `<own user id>/<own item id>/`.
+- Pictures sent in chats live in a second private bucket, `chat-images`, under
+  `<conversation id>/<sender id>/`. Only the two participants can read them, and
+  the same browser re-encoding and server-side magic-byte check apply.
 
 ## Browser hardening
 
@@ -54,8 +85,8 @@ security checklist, followed by the additional hardening that goes beyond it.
 - `Strict-Transport-Security` (2 years, preload), `X-Content-Type-Options: nosniff`,
   `X-Frame-Options: DENY`, `Referrer-Policy`, `Permissions-Policy`,
   `Cross-Origin-Opener-Policy`; `X-Powered-By` removed.
-- Session cookies are `HttpOnly` and managed by `@supabase/ssr`. The session is
-  verified with the auth server on every request (`getUser()`), not just decoded.
+- Session cookies are managed by `@supabase/ssr`. The session is verified with the
+  auth server on every request (`getUser()`), not just decoded.
 - Pages are rendered per request and sent with `Cache-Control: private, no-store`.
 - The site asks search engines not to index it.
 

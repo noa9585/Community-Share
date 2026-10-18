@@ -66,7 +66,16 @@ export interface MockState {
 
 function cloneSeed(): MockState {
   return {
-    users: DEMO_USERS.map(({ label: _label, ...user }) => ({ ...user })),
+    // Demo users carry a button label for the login screen; the store keeps only the user.
+    users: DEMO_USERS.map(({ id, full_name, email, residence_area, role, status, created_at }) => ({
+      id,
+      full_name,
+      email,
+      residence_area,
+      role,
+      status,
+      created_at,
+    })),
     areas: DEFAULT_AREAS.map((name) => ({ id: crypto.randomUUID(), name })),
     categories: SEED_CATEGORIES.map((c) => ({ ...c })),
     items: SEED_ITEMS.map((i) => ({ ...i })),
@@ -81,14 +90,10 @@ function cloneSeed(): MockState {
   };
 }
 
-let state: MockState = cloneSeed();
+const state: MockState = cloneSeed();
 
 export function getMockState(): MockState {
   return state;
-}
-
-export function resetMockStore(): void {
-  state = cloneSeed();
 }
 
 export function createId(): string {

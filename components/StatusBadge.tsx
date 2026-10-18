@@ -59,24 +59,3 @@ export function ReportStatusBadge({ status }: { status: string }) {
     </span>
   );
 }
-
-export function AvailabilityBadge({
-  available,
-  total,
-}: {
-  available: number;
-  total: number;
-}) {
-  const isAvailable = available > 0;
-  return (
-    <span
-      className={`rounded-full px-2 py-0.5 text-xs font-bold ${
-        isAvailable
-          ? "bg-primary-container text-on-primary-container"
-          : "bg-surface-variant text-on-surface-variant"
-      }`}
-    >
-      {isAvailable ? "פנוי" : "בהשאלה"}
-    </span>
-  );
-}

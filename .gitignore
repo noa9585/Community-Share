@@ -50,3 +50,12 @@ next-env.d.ts
 .agents/
 .claude/
 skills-lock.json
+
+# AI-assistant and editor instructions (local only)
+AGENTS.md
+CLAUDE.md
+.cursor/
+
+# Personal working notes (local only)
+docs/TODO_FOR_ME.md
+docs/GAP_REPORT.md

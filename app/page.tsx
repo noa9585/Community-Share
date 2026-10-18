@@ -2,8 +2,8 @@ import Link from "next/link";
 
 import { AppNav } from "@/components/AppNav";
 import { IncomingRequestActions, LoanActions } from "@/components/ItemActions";
-import { CatalogItemCard, CategoryButton, ItemThumbnail, getCategoryIcon } from "@/components/ItemCard";
-import { MaterialIcon } from "@/components/MaterialIcon";
+import { CatalogItemCard, CategoryButton, ItemThumbnail } from "@/components/ItemCard";
+import { MaterialIcon, getCategoryIcon } from "@/components/MaterialIcon";
 import { SearchAutocomplete } from "@/components/SearchAutocomplete";
 import { requirePageUser } from "@/lib/auth/session";
 import { getRepository } from "@/lib/data/index";

@@ -123,10 +123,6 @@ body {
   direction: ltr;
 }
 
-.trust-ring-gradient {
-  background: conic-gradient(#65dcd5 var(--percentage, 0%), transparent 0);
-}
-
 .trust-ring {
   position: relative;
   width: 48px;
@@ -145,23 +141,6 @@ body {
   border-radius: 50%;
   background: conic-gradient(#65dcd5 var(--progress, 0deg), #e2e2e1 0deg);
   z-index: -1;
-}
-
-.trust-ring-admin::before {
-  content: "";
-  position: absolute;
-  width: 36px;
-  height: 36px;
-  background: white;
-  border-radius: 50%;
-  z-index: 0;
-}
-
-.trust-ring-admin span {
-  position: relative;
-  z-index: 1;
-  font-weight: 700;
-  color: #321e48;
 }
 
 .sidebar-active-pill::after {

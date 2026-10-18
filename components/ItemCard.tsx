@@ -1,7 +1,6 @@
 import Link from "next/link";
 
-import { ItemImagePlaceholder, getCategoryIcon } from "@/components/MaterialIcon";
-import { MaterialIcon } from "@/components/MaterialIcon";
+import { ItemImagePlaceholder, MaterialIcon } from "@/components/MaterialIcon";
 import { TrustRingCatalog, trustScoreFromRating } from "@/components/TrustRing";
 import { firstImageUrl } from "@/lib/utils/url";
 import type { Item } from "@/types/database";
@@ -90,5 +89,3 @@ export function CategoryButton({
     </Link>
   );
 }
-
-export { getCategoryIcon };

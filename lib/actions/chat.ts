@@ -41,10 +41,16 @@ export async function startConversationAction(
   redirect(`/messages/${conversationId}`);
 }
 
+export type SendMessageResult = ActionResult & { messageId?: string };
+
+/**
+ * Sends one message. The chat shows it before this returns, so it does not
+ * re-render the page: the Realtime event refreshes both sides instead.
+ */
 export async function sendMessageAction(
   _prev: ActionResult,
   formData: FormData,
-): Promise<ActionResult> {
+): Promise<SendMessageResult> {
   const user = await requireApprovedUser();
 
   const parsed = messageSchema.safeParse({
@@ -58,6 +64,7 @@ export async function sendMessageAction(
 
   const { conversationId, body } = parsed.data;
 
+  let messageId: string;
   try {
     await enforceRateLimit("chatMessage", user.id);
     const [image = null] = await readUploadedImages(formData, "image", 1);
@@ -65,13 +72,12 @@ export async function sendMessageAction(
       return { error: "אי אפשר לשלוח הודעה ריקה" };
     }
     const repo = await getRepository();
-    await repo.sendMessage(user.id, conversationId, body, image);
+    ({ id: messageId } = await repo.sendMessage(user.id, conversationId, body, image));
   } catch (error) {
     return { error: messageForError(error, "ההודעה לא נשלחה") };
   }
 
-  revalidatePath(`/messages/${conversationId}`);
-  return {};
+  return { messageId };
 }
 
 /** Called by the open chat page whenever it shows a message the user had not seen. */

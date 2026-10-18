@@ -7,6 +7,18 @@ import { useEffect, useRef } from "react";
 import { refreshRealtimeTokenAction } from "@/lib/actions/realtime";
 
 const DEBOUNCE_MS = 250;
+
+/** Window event carrying a new chat message row, for the open chat to show at once. */
+export const CHAT_MESSAGE_EVENT = "community-share:chat-message";
+
+export type ChatMessageRow = {
+  id: string;
+  conversation_id: string;
+  sender_id: string | null;
+  kind: "text" | "image" | "system";
+  body: string;
+  created_at: string;
+};
 const POLL_MS = 8000;
 
 /** Seconds-since-epoch expiry of a JWT, read without verifying it. */
@@ -84,7 +96,16 @@ export function RealtimeRefresher({
 
     const channel = client
       .channel(`member-${userId}`)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "messages" }, refresh)
+      .on(
+        "postgres_changes",
+        { event: "INSERT", schema: "public", table: "messages" },
+        (payload) => {
+          // The open chat shows the message right away; the page refresh that
+          // follows updates the badges and anything else on screen.
+          window.dispatchEvent(new CustomEvent(CHAT_MESSAGE_EVENT, { detail: payload.new }));
+          refresh();
+        },
+      )
       .on(
         "postgres_changes",
         { event: "INSERT", schema: "public", table: "notifications", filter: `user_id=eq.${userId}` },

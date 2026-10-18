@@ -611,8 +611,9 @@ export const mockRepository: DataRepository = {
     if (!body && !image) throw new AppError("INVALID_INPUT");
 
     const now = new Date().toISOString();
+    const messageId = createId();
     state.messages.push({
-      id: createId(),
+      id: messageId,
       conversation_id: conversationId,
       sender_id: userId,
       kind: image ? "image" : "text",
@@ -648,6 +649,7 @@ export const mockRepository: DataRepository = {
         conversationId,
       );
     }
+    return { id: messageId };
   },
 
   async markConversationRead(conversationId, userId) {

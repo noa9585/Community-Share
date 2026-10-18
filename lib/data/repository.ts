@@ -100,7 +100,7 @@ export interface DataRepository {
     conversationId: string,
     body: string,
     image: UploadImage | null,
-  ): Promise<void>;
+  ): Promise<{ id: string }>;
   markConversationRead(conversationId: string, userId: string): Promise<void>;
 
   // Notifications

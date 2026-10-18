@@ -877,7 +877,7 @@ export const supabaseRepository: DataRepository = {
       }
     }
 
-    const { error } = await supabase.rpc("send_message", {
+    const { data, error } = await supabase.rpc("send_message", {
       p_conversation_id: conversationId,
       p_body: body,
       p_image_path: path,
@@ -888,6 +888,7 @@ export const supabaseRepository: DataRepository = {
       if (path) await supabase.storage.from(CHAT_BUCKET).remove([path]);
       throwWriteError(error);
     }
+    return { id: data as string };
   },
 
   async markConversationRead(conversationId) {

@@ -59,12 +59,14 @@ export function ItemForm({
 
   async function handleFiles(fileList: FileList | null) {
     if (!fileList || fileList.length === 0) return;
+    // Copy now: the input is cleared right after this call, which empties the live FileList.
+    const files = Array.from(fileList);
     setImageError(null);
     setProcessing(true);
 
     const accepted: NewImage[] = [];
     let failed = false;
-    for (const file of Array.from(fileList).slice(0, Math.max(0, remainingSlots))) {
+    for (const file of files.slice(0, Math.max(0, remainingSlots))) {
       const compressed = await compressImage(file);
       if (compressed) {
         accepted.push({ file: compressed, preview: URL.createObjectURL(compressed) });
@@ -75,7 +77,7 @@ export function ItemForm({
 
     setNewImages((current) => [...current, ...accepted]);
     if (failed) setImageError("חלק מהקבצים אינם תמונות תקינות ולא נוספו");
-    else if (fileList.length > remainingSlots) {
+    else if (files.length > remainingSlots) {
       setImageError(`ניתן להעלות עד ${MAX_ITEM_IMAGES} תמונות לפריט`);
     }
     setProcessing(false);

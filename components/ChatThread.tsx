@@ -187,7 +187,7 @@ export function ChatThread({
         <div
           ref={listRef}
           onScroll={handleScroll}
-          className="h-[calc(100dvh-24rem)] min-h-64 overflow-y-auto overscroll-contain rounded-2xl border border-secondary/10 bg-white/50 p-3 md:h-[calc(100dvh-21rem)] md:p-4"
+          className="h-[calc(100dvh-26rem)] min-h-64 overflow-y-auto overscroll-contain rounded-2xl border border-secondary/10 bg-white/50 p-3 md:h-[calc(100dvh-21rem)] md:p-4"
         >
           {messages.length === 0 ? (
             <p className="p-8 text-center text-on-surface-variant">

@@ -49,15 +49,19 @@ export function SideNavBar({
 }) {
   return (
     <aside className="fixed right-0 top-0 z-50 hidden h-screen w-sidebar-width flex-col border-l border-outline-variant/15 bg-secondary text-on-secondary md:flex">
-      <div className="flex flex-col items-center border-b border-white/10 p-gutter">
-        <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-brand-mint bg-primary-container">
+      <Link
+        href="/"
+        aria-label="מרכז הקהילה – לדף הבית"
+        className="group flex flex-col items-center border-b border-white/10 p-gutter transition-colors hover:bg-on-secondary-fixed-variant/20 focus-visible:outline-2 focus-visible:outline-brand-mint"
+      >
+        <div className="mb-3 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full border-2 border-brand-mint bg-primary-container transition-transform group-hover:scale-105">
           <MaterialIcon name="groups" className="text-secondary" size={36} />
         </div>
         <p className="font-headline-sm text-headline-sm font-bold text-on-secondary">
           מרכז הקהילה
         </p>
         <p className="font-label-md text-label-md opacity-80">בניית אמון מקומי</p>
-      </div>
+      </Link>
 
       <nav className="mt-stack-md flex-1 space-y-1 overflow-y-auto px-4" aria-label="ניווט ראשי">
         {visibleItems(user).map((item) => {
